@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tintkit"
+version = "0.1.0"
+description = "A small, themeable Tkinter widget kit — a dark/light photo-tool look with one live theme."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { file = "LICENSE" }
+authors = [{ name = "Lasha Kandelaki" }]
+keywords = ["tkinter", "ui", "widgets", "theme", "gui", "dark-mode", "lucide"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: User Interfaces",
+    "Environment :: X11 Applications",
+]
+
+# Zero required dependencies — the kit is pure-stdlib tkinter and runs as-is.
+dependencies = []
+
+[project.optional-dependencies]
+# Pillow is only needed to recolour the bundled Lucide icons. Without it every
+# widget still works and the shapes are still anti-aliased; the glyphs are just
+# skipped. Install with:  pip install tintkit[icons]
+icons = ["pillow"]
+
+[project.urls]
+Homepage = "https://github.com/"
+
+[tool.setuptools]
+packages = ["tintkit"]
+
+[tool.setuptools.package-data]
+tintkit = ["icons/*.png"]
