@@ -6,8 +6,8 @@ switches live with no restart.
 
 ![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![UI](https://img.shields.io/badge/ui-tkinter-informational)
 
-![TintKit — dark theme](docs/UI-Dark.jpg)
-![TintKit — light theme](docs/UI-Light.jpg)
+![TintKit — dark theme](https://raw.githubusercontent.com/kandelucky/tintkit/main/docs/UI-Dark.jpg)
+![TintKit — light theme](https://raw.githubusercontent.com/kandelucky/tintkit/main/docs/UI-Light.jpg)
 
 ## Run the gallery
 
@@ -22,14 +22,15 @@ demos; the controls themselves are genuinely interactive.)
 ## Install
 
 ```bash
-pip install git+https://github.com/kandelucky/tintkit
+pip install tintkit            # the kit — zero required dependencies
+pip install "tintkit[icons]"   # + Pillow, to recolour the Lucide icons
 ```
 
-Pure-stdlib tkinter — **zero required dependencies**. For the bundled
-[Lucide](https://lucide.dev/) icons (recoloured per theme) also `pip install
-pillow`; without it widgets still work and shapes stay anti-aliased (drawn in
-pure Tk) — only the glyphs are skipped. Point at your own icons with
-`set_icon_dir("…/my_icons")`.
+Pure-stdlib tkinter — no required dependencies. The `[icons]` extra adds
+[Pillow](https://python-pillow.org/) to recolour the bundled
+[Lucide](https://lucide.dev/) icons; without it widgets still work and shapes
+stay anti-aliased (drawn in pure Tk) — only the glyphs are skipped. Point at your
+own icons with `set_icon_dir("…/my_icons")`.
 
 ## Use it
 

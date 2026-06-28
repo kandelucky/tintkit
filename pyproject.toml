@@ -29,7 +29,9 @@ dependencies = []
 icons = ["pillow"]
 
 [project.urls]
-Homepage = "https://github.com/"
+Homepage = "https://github.com/kandelucky/tintkit"
+Repository = "https://github.com/kandelucky/tintkit"
+Issues = "https://github.com/kandelucky/tintkit/issues"
 
 [tool.setuptools]
 packages = ["tintkit"]

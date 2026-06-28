@@ -6,5 +6,9 @@ venv/
 .DS_Store
 Thumbs.db
 
+# build artifacts
+build/
+dist/
+
 # superseded standalone previews — kept locally, not tracked
 archive/
