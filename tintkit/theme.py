@@ -63,6 +63,11 @@ def on_color(c):
     return mix("#ffffff", c, 0.06)            # light text, faintly tinted
 
 
+def on_accent_color(c):
+    "Text/icon colour for a solid accent fill — always light, like the blue."
+    return mix("#ffffff", c, 0.06)            # faintly tinted white, any accent
+
+
 # ----------------------------------------------------------------------------
 # schemes (neutral palettes) + geometry
 # ----------------------------------------------------------------------------
@@ -138,8 +143,11 @@ class Theme:
         # geometry tokens are in baseline-96 px → scale to the active screen
         c.update({k: scaling.s(v) for k, v in GEOMETRY.items()})
 
-        a, a_h, a_s, a_on = self._shades(self.accent)
-        c.update(accent=a, accent_hover=a_h, accent_soft=a_s, on_accent=a_on)
+        a, a_h, a_s, _a_on = self._shades(self.accent)
+        # accent fills always carry light text/icons, so every accent reads
+        # like the blue does — no black-on-colour for the lighter accents.
+        c.update(accent=a, accent_hover=a_h, accent_soft=a_s,
+                 on_accent=on_accent_color(self.accent))
 
         d, d_h, _d_s, d_on = self._shades(self.danger)
         c.update(danger=d, danger_hover=d_h, on_danger=d_on)

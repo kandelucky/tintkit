@@ -273,7 +273,7 @@ def build_selection(parent, theme):
             for k, nm in enumerate(["IMG_0421.jpg", "IMG_0422.jpg",
                                     "IMG_0423.jpg", "IMG_0424.jpg"]):
                 SelectRow(col.widget, theme, mock_photo(k, 16), nm,
-                          selected=(k == 1)).pack(fill="x", pady=s(1))
+                          selected=(k == 1)).pack(fill="x", pady=0)
         elif mode == 1:                                 # small thumbnails
             grid = Surface(pad.widget, theme, bg="sidebar")
             grid.widget.pack()
@@ -459,7 +459,7 @@ def build_panels(parent, theme):
         bg=theme["sidebar"]))
     for i in range(16):
         Label(holder, theme, f"  IMG_{421+i}.jpg", fg="fg", bg="sidebar",
-              size=9, anchor="w").pack(fill="x", pady=3, padx=6)
+              size=9, anchor="w").pack(fill="x", pady=0, padx=6)
     holder.update_idletasks()
     cv.configure(scrollregion=cv.bbox("all"))
     Label(box.widget, theme, "(hover the sashes — the grip turns accent)",

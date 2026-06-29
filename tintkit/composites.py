@@ -183,12 +183,12 @@ def _tree_row(parent, theme, depth, name, kind, current):
                   12, fg="fg_dim", bg=base).pack(side="left")
     else:
         Surface(row.widget, theme, bg=base, width=s(12)).pack(side="left")
-    IconLabel(row.widget, theme, "folder-open", 16,
+    IconLabel(row.widget, theme, "folder-open", 14,
               fg=("accent" if current else "fg"), bg=base).pack(side="left",
                                                                 padx=(s(2), 0))
     Label(row.widget, theme, name, fg=("accent" if current else "fg"), bg=base,
           size=10, bold=current, cursor="hand2", padx=s(6)).pack(side="left",
-                                                                 pady=s(4))
+                                                                 pady=0)
 
 
 # ----------------------------------------------------------------------------
@@ -264,7 +264,7 @@ class SelectRow(_Selectable):
         self.holder.pack(fill="x")
         self.pic = tk.Label(self.holder, image=image, cursor="hand2")
         self.pic.image = image
-        self.pic.pack(side="left", padx=(s(4), s(8)), pady=s(2))
+        self.pic.pack(side="left", padx=(s(4), s(8)), pady=0)
         self.name = tk.Label(self.holder, text=name, anchor="w", cursor="hand2",
                              font=font(9))
         self.name.pack(side="left", fill="x", expand=True)

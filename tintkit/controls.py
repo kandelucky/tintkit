@@ -627,18 +627,18 @@ class Dropdown(CanvasControl):
         is_sel = (i == self.selected)
         tint = is_sel and self.mark in ("colour", "both")
         base = mix(t["panel"], t["accent"], 0.26) if tint else t["panel"]
-        cv = tk.Canvas(parent, height=s(30), width=self.w - s(2), bg=base,
+        cv = tk.Canvas(parent, height=s(22), width=self.w - s(2), bg=base,
                        highlightthickness=0, cursor="hand2")
         cv.pack(fill="x")
         tx = s(14)
         if self._has_icons and ic:
-            put_icon(cv, s(22), s(15), icons.load(ic, 16,
+            put_icon(cv, s(22), s(11), icons.load(ic, 16,
                                                   t["accent"] if tint else t["fg"]))
             tx = s(40)
-        cv.create_text(tx, s(15), text=lbl, anchor="w", fill=t["fg"],
+        cv.create_text(tx, s(11), text=lbl, anchor="w", fill=t["fg"],
                        font=font(9))
         if is_sel and self.mark in ("check", "both"):
-            put_icon(cv, self.w - s(20), s(15), icons.load("check", 14,
+            put_icon(cv, self.w - s(20), s(11), icons.load("check", 14,
                                                            t["accent"]))
         cv.bind("<Button-1>", lambda e, idx=i: self._choose(idx))
         cv.bind("<Enter>", lambda e: cv.configure(bg=mix(base, t["hover"], 0.6)))
@@ -744,7 +744,7 @@ class MultiDropdown(CanvasControl):
         self._popup = pop
 
     def _add_row(self, parent, i, lbl, ic):
-        cv = tk.Canvas(parent, height=s(30), width=self.w - s(2),
+        cv = tk.Canvas(parent, height=s(22), width=self.w - s(2),
                        highlightthickness=0, cursor="hand2")
         cv.pack(fill="x")
         cv.bind("<Button-1>", lambda e, idx=i: self._toggle_row(idx))
@@ -763,18 +763,18 @@ class MultiDropdown(CanvasControl):
         cv.configure(bg=base)
         cv.delete("all")
         if on:                                 # ticked box + check
-            aa_round_rect(cv, s(12), s(9), s(24), s(21), s(4), fill=t["accent"],
+            aa_round_rect(cv, s(12), s(5), s(24), s(17), s(4), fill=t["accent"],
                           behind=base)
-            put_icon(cv, s(18), s(15), icons.load("check", 11, t["on_accent"]))
+            put_icon(cv, s(18), s(11), icons.load("check", 11, t["on_accent"]))
         else:                                  # empty box
-            aa_round_rect(cv, s(12), s(9), s(24), s(21), s(4), outline=t["ring"],
+            aa_round_rect(cv, s(12), s(5), s(24), s(17), s(4), outline=t["ring"],
                           width=s(2), behind=base)
         tx = s(36)
         if self._has_icons and ic:
-            put_icon(cv, s(44), s(15),
+            put_icon(cv, s(44), s(11),
                      icons.load(ic, 16, t["accent"] if on else t["fg"]))
             tx = s(60)
-        cv.create_text(tx, s(15), text=lbl, anchor="w", fill=t["fg"], font=font(9))
+        cv.create_text(tx, s(11), text=lbl, anchor="w", fill=t["fg"], font=font(9))
 
     def _toggle_row(self, i):
         self.selected.discard(i) if i in self.selected else self.selected.add(i)
