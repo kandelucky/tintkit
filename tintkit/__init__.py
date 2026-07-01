@@ -26,10 +26,11 @@ from .scaling import s, set_scale
 from .theme import (Theme, mix, lighten, darken, on_color,
                     SCHEMES, DEFAULT_ACCENT)
 from .primitives import (CanvasControl, Surface, Label, IconLabel,
-                         rounded_rect, put_icon, font, measure, FONT_FAMILY)
+                         rounded_rect, put_icon, font, measure, FONT_FAMILY,
+                         resolve_font)
 from .controls import (Button, IconButton, Slider, Toggle, Radio, RadioGroup,
                        Checkbox, SegmentedTabs, Badge, Tag, ProgressBar,
-                       Tooltip, TextField, Dropdown, MultiDropdown)
+                       Tooltip, HoverTip, TextField, Dropdown, MultiDropdown)
 from .containers import (Card, SectionHeader, hero_line, callout, dialog,
                          v_sash, h_sash, themed_scrollbar)
 from .composites import (toolbar, tool_rail, FolderNav, folder_tree,
@@ -41,10 +42,10 @@ __all__ = [
     "DEFAULT_ACCENT", "icons", "set_icon_dir", "setup_dpi",
     "enable_dpi_awareness", "s", "set_scale",
     "CanvasControl", "Surface", "Label", "IconLabel",
-    "rounded_rect", "put_icon", "font", "measure", "FONT_FAMILY",
+    "rounded_rect", "put_icon", "font", "measure", "FONT_FAMILY", "resolve_font",
     "Button", "IconButton", "Slider", "Toggle", "Radio", "RadioGroup",
     "Checkbox", "SegmentedTabs", "Badge", "Tag", "ProgressBar", "Tooltip",
-    "TextField", "Dropdown", "MultiDropdown",
+    "HoverTip", "TextField", "Dropdown", "MultiDropdown",
     "Card", "SectionHeader", "hero_line", "callout", "dialog",
     "v_sash", "h_sash", "themed_scrollbar",
     "toolbar", "tool_rail", "FolderNav", "folder_tree", "SelectTile",
@@ -82,8 +83,9 @@ def setup_dpi(root, zoom=1.0):
     * Tk text scaling → ``(screen_dpi / 72) * zoom`` (fonts + text measurement).
     * The kit's geometry scale ``S`` → ``(screen_dpi / 96) * zoom`` (canvas px).
     """
-    from . import scaling
+    from . import scaling, primitives
     enable_dpi_awareness()                 # idempotent; real fix is at import
+    primitives.resolve_font(root)          # native UI font for this OS
     try:
         fpix = root.winfo_fpixels("1i")
         root.tk.call("tk", "scaling", (fpix / 72.0) * zoom)

@@ -157,16 +157,21 @@ class Slider(CanvasControl):
     "Labelled value slider; drag the knob. ``chip`` tints a colour swatch."
 
     def __init__(self, parent, theme, label, value=132, lo=0, hi=200,
-                 neutral=100, chip=None, width=240, command=None, bg="bg"):
+                 neutral=100, chip=None, width=240, command=None, bg="bg",
+                 on_press=None, on_release=None):
         self.label, self.lo, self.hi, self.neutral = label, lo, hi, neutral
         self.value, self.chip, self.command = value, chip, command
+        # on_press/on_release let the host batch a whole drag into one undo
+        # entry: snapshot on press, commit on release. Both optional.
+        self.on_press, self.on_release = on_press, on_release
         w = s(width)
         self.x0 = s(12) + (s(14) if chip else 0)
         self.x1 = w - s(12)
         super().__init__(parent, theme, w, s(38), bg=bg, cursor="hand2")
         self.canvas.bind("<Configure>", self._cfg)
-        self.canvas.bind("<Button-1>", self._drag)
+        self.canvas.bind("<Button-1>", self._press)
         self.canvas.bind("<B1-Motion>", self._drag)
+        self.canvas.bind("<ButtonRelease-1>", self._release)
 
     def _interactive(self):
         return False                           # hover doesn't alter the look
@@ -180,12 +185,31 @@ class Slider(CanvasControl):
     def _v2x(self, v):
         return self.x0 + (v - self.lo) / (self.hi - self.lo) * (self.x1 - self.x0)
 
+    def _press(self, e):
+        "Drag begins: let the host snapshot one undo entry, then apply the click."
+        if self.on_press:
+            self.on_press()
+        self._drag(e)
+
+    def _release(self, _e):
+        "Drag ends: the host commits one undo entry for the whole gesture."
+        if self.on_release:
+            self.on_release()
+
     def _drag(self, e):
         f = min(1.0, max(0.0, (e.x - self.x0) / (self.x1 - self.x0)))
         self.value = round(self.lo + f * (self.hi - self.lo))
         self.repaint()
         if self.command:
             self.command(self.value)
+
+    def set(self, v):
+        "Set the value and redraw WITHOUT firing ``command`` (for resets)."
+        self.value = max(self.lo, min(self.hi, v))
+        self.repaint()
+
+    def get(self):
+        return self.value
 
     def draw(self):
         c, t = self.canvas, self.theme
@@ -498,6 +522,86 @@ class Tooltip(CanvasControl):
                      outline=t["border"])
         c.create_text(self.w / 2, s(14), text=self.text,
                       fill=on_color(t["tooltip"]), font=font(9))
+
+
+# ----------------------------------------------------------------------------
+# HoverTip  (a delayed hover tip that attaches to any widget)
+# ----------------------------------------------------------------------------
+class HoverTip:
+    """A small delayed dark hover tip, attachable to any widget.
+
+    Where :class:`Tooltip` is a static bubble you place in a layout, this binds
+    to an existing widget and pops a themed ``Toplevel`` after a short hover,
+    hiding again on leave or click. It reads the theme fresh on every show, so
+    it always matches the current scheme — no subscription needed.
+
+        HoverTip(save_btn.canvas, theme, "Save (Ctrl+S)")
+    """
+
+    def __init__(self, widget, theme, text, delay=450):
+        self.widget = widget
+        self.theme = theme
+        self.text = text
+        self.delay = delay
+        self.tip = None
+        self._job = None
+        # add="+" so we never clobber the widget's own hover / click bindings.
+        widget.bind("<Enter>", self._schedule, add="+")
+        widget.bind("<Leave>", self._hide, add="+")
+        widget.bind("<Button>", self._hide, add="+")
+
+    def set_text(self, text):
+        "Swap the tip text (e.g. a value that changes as the user edits)."
+        self.text = text
+
+    def _schedule(self, _e=None):
+        self._cancel()
+        if self.text:
+            self._job = self.widget.after(self.delay, self._show)
+
+    def _cancel(self):
+        if self._job is not None:
+            try:
+                self.widget.after_cancel(self._job)
+            except tk.TclError:
+                pass
+            self._job = None
+
+    def _show(self):
+        self._job = None
+        if self.tip is not None or not self.text:
+            return
+        try:
+            if not self.widget.winfo_exists():
+                return
+            x = self.widget.winfo_rootx() + self.widget.winfo_width() // 2
+            y = self.widget.winfo_rooty() + self.widget.winfo_height() + s(6)
+        except tk.TclError:
+            return
+        t = self.theme
+        self.tip = tk.Toplevel(self.widget)
+        self.tip.wm_overrideredirect(True)
+        try:
+            self.tip.attributes("-topmost", True)
+        except tk.TclError:
+            pass
+        self.tip.configure(bg=t["border"])          # 1px hairline via inset
+        lbl = tk.Label(self.tip, text=self.text, bg=t["tooltip"],
+                       fg=on_color(t["tooltip"]), font=font(9),
+                       padx=s(8), pady=s(3))
+        lbl.pack(padx=s(1), pady=s(1))
+        self.tip.update_idletasks()
+        w = self.tip.winfo_width()
+        self.tip.wm_geometry(f"+{x - w // 2}+{y}")
+
+    def _hide(self, _e=None):
+        self._cancel()
+        if self.tip is not None:
+            try:
+                self.tip.destroy()
+            except tk.TclError:
+                pass
+            self.tip = None
 
 
 # ----------------------------------------------------------------------------

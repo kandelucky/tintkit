@@ -16,17 +16,61 @@ A subclass computes its size first, then hands it to the base::
             rounded_rect(self.canvas, 0, 0, 16, 16, 8, fill=self.theme["accent"])
 """
 
+import sys
 import tkinter as tk
 import tkinter.font as tkfont
 
 from . import icons
 
-FONT_FAMILY = "Segoe UI"
+# UI font. Segoe UI is Windows-only, so we pick a native face per OS and, at
+# ``setup_dpi`` time, verify it is actually installed — falling back to Tk's own
+# default UI font and finally the Tk-guaranteed ``Helvetica`` alias. The result
+# is a real, native-looking sans on Windows, macOS and Linux alike.
+_PREFERRED_FONTS = {
+    "win32":  ["Segoe UI", "Tahoma"],
+    "darwin": ["SF Pro Text", "Helvetica Neue", "Lucida Grande"],
+}
+# Common desktop-Linux (and other unix) sans families, best first.
+_FALLBACK_FONTS = ["Noto Sans", "DejaVu Sans", "Cantarell", "Ubuntu",
+                   "Liberation Sans"]
+
+
+def _default_family():
+    "A safe per-platform family for use before ``resolve_font`` runs."
+    return {"win32": "Segoe UI", "darwin": "Helvetica Neue"}.get(
+        sys.platform, "DejaVu Sans")
+
+
+FONT_FAMILY = _default_family()
 
 
 # ----------------------------------------------------------------------------
 # typography
 # ----------------------------------------------------------------------------
+def resolve_font(root=None):
+    """Pick the best UI font actually installed on this OS; set ``FONT_FAMILY``.
+
+    ``setup_dpi`` calls this once a root exists. It tries the platform's
+    preferred families, then Tk's native default UI font, then the guaranteed
+    ``Helvetica`` alias — so text always renders with a real face anywhere.
+    Returns the chosen family.
+    """
+    global FONT_FAMILY
+    try:
+        available = set(tkfont.families(root))
+    except tk.TclError:
+        available = set()
+    for fam in _PREFERRED_FONTS.get(sys.platform, []) + _FALLBACK_FONTS:
+        if fam in available:
+            FONT_FAMILY = fam
+            return fam
+    try:                                        # native default UI font's family
+        FONT_FAMILY = tkfont.nametofont("TkDefaultFont").actual("family")
+    except tk.TclError:
+        FONT_FAMILY = "Helvetica"               # Tk-guaranteed sans alias
+    return FONT_FAMILY
+
+
 def font(size, bold=False):
     "A plain (family, size[, 'bold']) tuple for label/text use."
     return (FONT_FAMILY, size, "bold") if bold else (FONT_FAMILY, size)
