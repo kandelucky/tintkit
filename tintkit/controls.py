@@ -225,7 +225,10 @@ class Slider(CanvasControl):
         if abs(kx - nx) > 1:
             c.create_line(nx, y, kx, y, fill=t["accent"], width=th,
                           capstyle="round")
-        aa_round_rect(c, kx - s(6), y - s(9), kx + s(6), y + s(9), s(5),
+        # Shrink the knob to fit a short (compact / bare) track; full-size on a
+        # roomy one. Keeps the knob from overflowing a slim canvas.
+        kh = max(s(5), min(s(9), y - s(2)))
+        aa_round_rect(c, kx - s(6), y - kh, kx + s(6), y + kh, min(s(5), kh),
                       fill=t["accent"], behind=self.bg)
 
     def draw(self):
@@ -636,33 +639,48 @@ class TitledSlider:
     def __init__(self, parent, theme, label, value=132, lo=0, hi=200,
                  neutral=100, command=None, bg="bg", on_press=None,
                  on_release=None, on_reset=None, reset_tip="Reset",
-                 value_fmt=None):
+                 value_fmt=None, chip=None, compact=False):
         self.theme = theme
         self._bg = bg
         self.neutral = neutral
         self._command = command
         self._fmt = value_fmt or self._delta
+        # compact = a denser strip (smaller text, reset and track) for long
+        # stacks of minor sliders; the default is roomier for a few key ones.
+        fs = 8 if compact else 9
+        rw = 16 if compact else 22
+        ric = 10 if compact else 13
+        th = 14 if compact else 24
+        gap = 0 if compact else s(4)
         self.frame = tk.Frame(parent, bg=theme[bg])
         strip = tk.Frame(self.frame, bg=theme[bg])
         strip.pack(fill="x")
+        # Optional colour swatch (e.g. a colour-mixer band) at the strip's left.
+        # A fixed hex, not a theme token, so the restyle pass leaves it alone.
+        if chip:
+            sw = tk.Frame(strip, bg=chip, width=s(10), height=s(10))
+            sw.pack(side="left", padx=(0, s(6)))
+            sw.pack_propagate(False)
+            self._chip = sw
         self._title = tk.Label(strip, text=label, bg=theme[bg], fg=theme["fg"],
-                               font=font(9))
+                               font=font(fs))
         self._title.pack(side="left")
         # Reset icon lives in the strip (not beside the track), so the track
         # gets the full width. Packed before the value so it stays rightmost.
         if on_reset is not None:
-            self._reset = IconButton(strip, theme, "rotate-ccw", w=22, h=22,
-                                     icon_px=13, bg=bg, command=on_reset)
+            self._reset = IconButton(strip, theme, "rotate-ccw", w=rw, h=rw,
+                                     icon_px=ric, bg=bg, command=on_reset)
             self._reset.pack(side="right")
             HoverTip(self._reset.canvas, theme, reset_tip)
         self._value = tk.Label(strip, text="", bg=theme[bg], fg=theme["fg_dim"],
-                               font=font(9))
+                               font=font(fs))
         self._value.pack(side="right",
-                         padx=(0, s(8) if on_reset is not None else 0))
+                         padx=(0, s(6) if on_reset is not None else 0))
         self._slider = Slider(self.frame, theme, "", value=value, lo=lo, hi=hi,
                               neutral=neutral, command=self._on_cmd, bg=bg,
-                              bare=True, on_press=on_press, on_release=on_release)
-        self._slider.pack(fill="x", pady=(s(4), 0))
+                              bare=True, height=th, on_press=on_press,
+                              on_release=on_release)
+        self._slider.pack(fill="x", pady=(gap, 0))
         theme.subscribe(self._restyle)
         self.frame.bind("<Destroy>", self._destroyed)
         self._show(value)
