@@ -788,8 +788,59 @@ class TextField:
         self.outer.place(**k)
         return self
 
+
+class TextArea:
+    """A hairline-framed MULTI-line text box that restyles on theme change.
+
+    The single-line sibling of :class:`TextField`; wraps a real ``tk.Text`` so
+    callers keep full Text access via ``.text`` (bindings, tags, insert/delete,
+    ``state=`` disable). The frame turns accent while the box has focus."""
+
+    def __init__(self, parent, theme, value="", height=2, bg="bg"):
+        self.theme = theme
+        self._focused = False
+        self.outer = tk.Frame(parent, bg=theme["border"])
+        self.text = tk.Text(self.outer, height=height, relief="flat", wrap="word",
+                            font=font(10), padx=s(6), pady=s(4),
+                            highlightthickness=0, bd=0)
+        if value:
+            self.text.insert("1.0", value)
+        self.text.pack(fill="both", expand=True, padx=s(1), pady=s(1))
+        self.text.bind("<FocusIn>", lambda e: self._focus(True), add="+")
+        self.text.bind("<FocusOut>", lambda e: self._focus(False), add="+")
+        theme.subscribe(self._restyle)
+        self.outer.bind("<Destroy>", self._destroyed)
+        self._restyle()
+
+    def _destroyed(self, e):
+        if e.widget is self.outer:
+            self.theme.unsubscribe(self._restyle)
+
+    def _focus(self, on):
+        self._focused = on
+        self._restyle()
+
+    def _restyle(self):
+        try:
+            t = self.theme
+            self.outer.configure(bg=t["accent"] if self._focused else t["border"])
+            self.text.configure(bg=t["chip"], fg=t["fg"], insertbackground=t["fg"])
+        except tk.TclError:
+            pass
+
+    def get(self):
+        return self.text.get("1.0", "end-1c")
+
+    def pack(self, **k):
+        self.outer.pack(**k)
+        return self
+
     def grid(self, **k):
         self.outer.grid(**k)
+        return self
+
+    def place(self, **k):
+        self.outer.place(**k)
         return self
 
 

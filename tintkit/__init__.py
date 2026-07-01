@@ -30,8 +30,8 @@ from .primitives import (CanvasControl, Surface, Label, IconLabel,
                          resolve_font)
 from .controls import (Button, IconButton, Slider, TitledSlider, Toggle, Radio,
                        RadioGroup, Checkbox, SegmentedTabs, Badge, Tag,
-                       ProgressBar, Tooltip, HoverTip, TextField, Dropdown,
-                       MultiDropdown)
+                       ProgressBar, Tooltip, HoverTip, TextField, TextArea,
+                       Dropdown, MultiDropdown)
 from .containers import (Card, SectionHeader, hero_line, callout, dialog,
                          v_sash, h_sash, themed_scrollbar)
 from .composites import (toolbar, tool_rail, FolderNav, folder_tree,
@@ -47,7 +47,7 @@ __all__ = [
     "Button", "IconButton", "Slider", "TitledSlider", "Toggle", "Radio",
     "RadioGroup",
     "Checkbox", "SegmentedTabs", "Badge", "Tag", "ProgressBar", "Tooltip",
-    "HoverTip", "TextField", "Dropdown", "MultiDropdown",
+    "HoverTip", "TextField", "TextArea", "Dropdown", "MultiDropdown",
     "Card", "SectionHeader", "hero_line", "callout", "dialog",
     "v_sash", "h_sash", "themed_scrollbar",
     "toolbar", "tool_rail", "FolderNav", "folder_tree", "SelectTile",
