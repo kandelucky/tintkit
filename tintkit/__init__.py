@@ -28,9 +28,10 @@ from .theme import (Theme, mix, lighten, darken, on_color,
 from .primitives import (CanvasControl, Surface, Label, IconLabel,
                          rounded_rect, put_icon, font, measure, FONT_FAMILY,
                          resolve_font)
-from .controls import (Button, IconButton, Slider, Toggle, Radio, RadioGroup,
-                       Checkbox, SegmentedTabs, Badge, Tag, ProgressBar,
-                       Tooltip, HoverTip, TextField, Dropdown, MultiDropdown)
+from .controls import (Button, IconButton, Slider, TitledSlider, Toggle, Radio,
+                       RadioGroup, Checkbox, SegmentedTabs, Badge, Tag,
+                       ProgressBar, Tooltip, HoverTip, TextField, Dropdown,
+                       MultiDropdown)
 from .containers import (Card, SectionHeader, hero_line, callout, dialog,
                          v_sash, h_sash, themed_scrollbar)
 from .composites import (toolbar, tool_rail, FolderNav, folder_tree,
@@ -43,7 +44,8 @@ __all__ = [
     "enable_dpi_awareness", "s", "set_scale",
     "CanvasControl", "Surface", "Label", "IconLabel",
     "rounded_rect", "put_icon", "font", "measure", "FONT_FAMILY", "resolve_font",
-    "Button", "IconButton", "Slider", "Toggle", "Radio", "RadioGroup",
+    "Button", "IconButton", "Slider", "TitledSlider", "Toggle", "Radio",
+    "RadioGroup",
     "Checkbox", "SegmentedTabs", "Badge", "Tag", "ProgressBar", "Tooltip",
     "HoverTip", "TextField", "Dropdown", "MultiDropdown",
     "Card", "SectionHeader", "hero_line", "callout", "dialog",

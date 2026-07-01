@@ -158,16 +158,21 @@ class Slider(CanvasControl):
 
     def __init__(self, parent, theme, label, value=132, lo=0, hi=200,
                  neutral=100, chip=None, width=240, command=None, bg="bg",
-                 on_press=None, on_release=None):
+                 on_press=None, on_release=None, bare=False, height=None):
         self.label, self.lo, self.hi, self.neutral = label, lo, hi, neutral
         self.value, self.chip, self.command = value, chip, command
         # on_press/on_release let the host batch a whole drag into one undo
         # entry: snapshot on press, commit on release. Both optional.
         self.on_press, self.on_release = on_press, on_release
+        # bare = draw only the track + knob (no label / value text), for when a
+        # host puts the title on its own strip above (see TitledSlider). Shorter
+        # by default since it carries no text row.
+        self.bare = bare
         w = s(width)
         self.x0 = s(12) + (s(14) if chip else 0)
         self.x1 = w - s(12)
-        super().__init__(parent, theme, w, s(38), bg=bg, cursor="hand2")
+        h = height if height is not None else (24 if bare else 38)
+        super().__init__(parent, theme, w, s(h), bg=bg, cursor="hand2")
         self.canvas.bind("<Configure>", self._cfg)
         self.canvas.bind("<Button-1>", self._press)
         self.canvas.bind("<B1-Motion>", self._drag)
@@ -211,16 +216,9 @@ class Slider(CanvasControl):
     def get(self):
         return self.value
 
-    def draw(self):
-        c, t = self.canvas, self.theme
-        if self.chip:
-            rounded_rect(c, 0, s(13), s(10), s(23), s(2), fill=self.chip)
-        c.create_text(self.x0, s(11), text=self.label, anchor="w", fill=t["fg"],
-                      font=font(9))
-        d = self.value - self.neutral
-        c.create_text(self.x1, s(11), text=(f"+{d}" if d > 0 else str(d)),
-                      anchor="e", fill=t["fg_dim"], font=font(9))
-        y, th = s(27), t["track_h"]
+    def _draw_track(self, c, t, y):
+        "The track + neutral→value fill + knob, centred on baseline ``y``."
+        th = t["track_h"]
         c.create_line(self.x0, y, self.x1, y, fill=t["divider"], width=th,
                       capstyle="round")
         nx, kx = self._v2x(self.neutral), self._v2x(self.value)
@@ -229,6 +227,20 @@ class Slider(CanvasControl):
                           capstyle="round")
         aa_round_rect(c, kx - s(6), y - s(9), kx + s(6), y + s(9), s(5),
                       fill=t["accent"], behind=self.bg)
+
+    def draw(self):
+        c, t = self.canvas, self.theme
+        if self.bare:                          # track only; title lives elsewhere
+            self._draw_track(c, t, self.h / 2)
+            return
+        if self.chip:
+            rounded_rect(c, 0, s(13), s(10), s(23), s(2), fill=self.chip)
+        c.create_text(self.x0, s(11), text=self.label, anchor="w", fill=t["fg"],
+                      font=font(9))
+        d = self.value - self.neutral
+        c.create_text(self.x1, s(11), text=(f"+{d}" if d > 0 else str(d)),
+                      anchor="e", fill=t["fg_dim"], font=font(9))
+        self._draw_track(c, t, s(27))
 
 
 # ----------------------------------------------------------------------------
@@ -602,6 +614,109 @@ class HoverTip:
             except tk.TclError:
                 pass
             self.tip = None
+
+
+# ----------------------------------------------------------------------------
+# TitledSlider  (title strip + reset above a full-width bare track)
+# ----------------------------------------------------------------------------
+class TitledSlider:
+    """A slider whose title sits on its own strip, so the label never overlaps
+    the track in a dense stack. The strip carries the label (left), the value
+    and an optional reset icon (right); a full-width bare :class:`Slider` sits
+    below.
+
+        TitledSlider(panel, theme, "Exposure", value=100, command=set_exp,
+                     on_reset=reset_exp).pack(fill="x")
+
+    ``value_fmt(value, neutral) -> str`` overrides the readout (default: the
+    signed delta from neutral, matching :class:`Slider`). ``.set()`` / ``.get()``
+    mirror the plain slider; ``on_reset`` fires when the reset icon is clicked —
+    the host updates the model, then usually calls ``.set()`` to refresh."""
+
+    def __init__(self, parent, theme, label, value=132, lo=0, hi=200,
+                 neutral=100, command=None, bg="bg", on_press=None,
+                 on_release=None, on_reset=None, reset_tip="Reset",
+                 value_fmt=None):
+        self.theme = theme
+        self._bg = bg
+        self.neutral = neutral
+        self._command = command
+        self._fmt = value_fmt or self._delta
+        self.frame = tk.Frame(parent, bg=theme[bg])
+        strip = tk.Frame(self.frame, bg=theme[bg])
+        strip.pack(fill="x")
+        self._title = tk.Label(strip, text=label, bg=theme[bg], fg=theme["fg"],
+                               font=font(9))
+        self._title.pack(side="left")
+        # Reset icon lives in the strip (not beside the track), so the track
+        # gets the full width. Packed before the value so it stays rightmost.
+        if on_reset is not None:
+            self._reset = IconButton(strip, theme, "rotate-ccw", w=22, h=22,
+                                     icon_px=13, bg=bg, command=on_reset)
+            self._reset.pack(side="right")
+            HoverTip(self._reset.canvas, theme, reset_tip)
+        self._value = tk.Label(strip, text="", bg=theme[bg], fg=theme["fg_dim"],
+                               font=font(9))
+        self._value.pack(side="right",
+                         padx=(0, s(8) if on_reset is not None else 0))
+        self._slider = Slider(self.frame, theme, "", value=value, lo=lo, hi=hi,
+                              neutral=neutral, command=self._on_cmd, bg=bg,
+                              bare=True, on_press=on_press, on_release=on_release)
+        self._slider.pack(fill="x", pady=(s(4), 0))
+        theme.subscribe(self._restyle)
+        self.frame.bind("<Destroy>", self._destroyed)
+        self._show(value)
+
+    # -- value plumbing ----------------------------------------------------
+    def _delta(self, v, n):
+        d = v - n
+        return f"+{d}" if d > 0 else str(d)
+
+    def _show(self, v):
+        self._value.configure(text=self._fmt(v, self.neutral))
+
+    def _on_cmd(self, v):
+        self._show(v)
+        if self._command:
+            self._command(v)
+
+    def set(self, v):
+        "Set the value + refresh the readout WITHOUT firing command (for resets)."
+        self._slider.set(v)
+        self._show(self._slider.get())
+
+    def get(self):
+        return self._slider.get()
+
+    # -- theme -------------------------------------------------------------
+    def _restyle(self):
+        try:
+            t, bg = self.theme, self.theme[self._bg]
+            self.frame.configure(bg=bg)
+            for w in self.frame.winfo_children():
+                if isinstance(w, tk.Frame):
+                    w.configure(bg=bg)
+            self._title.configure(bg=bg, fg=t["fg"])
+            self._value.configure(bg=bg, fg=t["fg_dim"])
+        except tk.TclError:
+            pass
+
+    def _destroyed(self, e):
+        if e.widget is self.frame:
+            self.theme.unsubscribe(self._restyle)
+
+    # -- geometry ----------------------------------------------------------
+    def pack(self, **k):
+        self.frame.pack(**k)
+        return self
+
+    def grid(self, **k):
+        self.frame.grid(**k)
+        return self
+
+    def place(self, **k):
+        self.frame.place(**k)
+        return self
 
 
 # ----------------------------------------------------------------------------
