@@ -688,6 +688,11 @@ class TitledSlider:
     def get(self):
         return self._slider.get()
 
+    @property
+    def canvas(self):
+        "The bare track's canvas — attach a HoverTip / extra binding here."
+        return self._slider.canvas
+
     # -- theme -------------------------------------------------------------
     def _restyle(self):
         try:
