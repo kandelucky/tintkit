@@ -34,7 +34,7 @@ from .controls import (Button, IconButton, Slider, TitledSlider, Toggle, Radio,
                        Dropdown, MultiDropdown)
 from .containers import (Card, SectionHeader, hero_line, callout, dialog,
                          v_sash, h_sash, themed_scrollbar)
-from .composites import (toolbar, tool_rail, FolderNav, folder_tree,
+from .composites import (toolbar, tool_rail, FolderNav, FolderTree, folder_tree,
                          SelectTile, SelectRow, MultiSelectRow,
                          multiselect_list, SettingsWindow)
 
@@ -50,7 +50,7 @@ __all__ = [
     "HoverTip", "TextField", "TextArea", "Dropdown", "MultiDropdown",
     "Card", "SectionHeader", "hero_line", "callout", "dialog",
     "v_sash", "h_sash", "themed_scrollbar",
-    "toolbar", "tool_rail", "FolderNav", "folder_tree", "SelectTile",
+    "toolbar", "tool_rail", "FolderNav", "FolderTree", "folder_tree", "SelectTile",
     "SelectRow", "MultiSelectRow", "multiselect_list", "SettingsWindow",
 ]
 

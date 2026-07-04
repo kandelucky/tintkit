@@ -63,13 +63,39 @@ def tool_rail(parent, theme, items, active=0, bg="bar", command=None):
 
 # ----------------------------------------------------------------------------
 # Folder navigation — path bar + collapsible folder tree
+#
+# Data-driven and fully wired: the host supplies rows + callbacks and these
+# handle crumb clicks, the ↑ button, per-row expand/collapse chevrons, row
+# clicks and the live filter box. Row/crumb specs carry an optional trailing
+# ``payload`` that is handed straight back to the callbacks (a folder path, a
+# node id — whatever the host keyed its tree on).
 # ----------------------------------------------------------------------------
 class FolderNav:
+    """A breadcrumb path bar above a collapsible, interactive folder tree.
+
+        crumbs     : [(label, is_current)] or [(label, payload, is_current)]
+        tree_rows  : [(depth, name, kind, current[, payload])]
+                     kind: 'open' (expanded) · 'closed' (collapsed) ·
+                           'leaf' (no children)
+        count_text : text for the right-hand badge (e.g. '248 photos')
+        on_up      : ()        — the ↑ (up a folder) button
+        on_crumb   : (payload) — a breadcrumb was clicked
+        on_row     : (payload) — a row's folder name was clicked
+        on_toggle  : (payload) — a row's expand/collapse chevron
+        on_filter  : (text)    — every filter keystroke (None hides the box)
+
+    Call :meth:`update` after the host navigates / expands / filters to feed
+    fresh crumbs, rows or count; the filter entry keeps its focus and text.
+    """
+
     def __init__(self, parent, theme, crumbs, tree_rows, count_text,
-                 filter_text="Filter folders…"):
+                 filter_text="Filter folders…", on_up=None, on_crumb=None,
+                 on_row=None, on_toggle=None, on_filter=None):
         self.theme = theme
-        self.tree_rows = tree_rows
+        self.on_up, self.on_crumb = on_up, on_crumb
         self.filter_text = filter_text
+        self._crumbs = crumbs
+        self._count = count_text
         self.open = True
         self.box = Surface(parent, theme, bg="bg")
 
@@ -79,35 +105,64 @@ class FolderNav:
         bar.widget.pack(fill="x", padx=s(1), pady=s(1))
         self.bar = bar.widget
 
-        IconButton(self.bar, theme, "chevron-up", w=32, h=38, bg="chip").pack(
-            side="left", padx=(s(4), s(2)))
+        self.up_btn = IconButton(self.bar, theme, "chevron-up", w=32, h=38,
+                                 bg="chip", command=self._up)
+        self.up_btn.pack(side="left", padx=(s(4), s(2)))
         Surface(self.bar, theme, bg="border", width=s(1), height=s(22)).pack(
             side="left", padx=s(4))
-        for i, (nm, cur) in enumerate(crumbs):
-            if i:
-                IconLabel(self.bar, theme, "chevron-right", 12, fg="fg_dim",
-                          bg="chip").pack(side="left", padx=s(2))
-            self._crumb(nm, cur)
+        self._crumb_box = Surface(self.bar, theme, bg="chip")
+        self._crumb_box.widget.pack(side="left")
 
         self.toggle_btn = IconButton(self.bar, theme, "chevron-up", w=26, h=38,
                                      active=True, bg="chip",
                                      command=self._toggle)
         self.toggle_btn.pack(side="left", padx=(s(2), 0))
-        Badge(self.bar, theme, count_text, bg="chip").pack(side="right",
-                                                           padx=s(8))
+        self._badge_box = Surface(self.bar, theme, bg="chip")
+        self._badge_box.widget.pack(side="right", padx=s(8))
 
         self.drop = Surface(self.box.widget, theme, bg="bg")
+        self.tree = FolderTree(self.drop.widget, theme, filter_text,
+                               on_row, on_toggle, on_filter)
+        self.tree.pack(fill="x")
+
+        self._build_crumbs()
+        self._build_badge()
+        self.tree.set_rows(tree_rows)
         self._render()
 
-    def _crumb(self, name, current):
-        lb = Label(self.bar, self.theme, name, fg=("fg" if current else "fg_dim"),
-                   bg="chip", size=11, bold=current, cursor="hand2",
-                   padx=s(5), pady=s(9))
-        lb.widget.pack(side="left")
-        if not current:
-            w = lb.widget
-            w.bind("<Enter>", lambda e: w.configure(fg=self.theme["accent"]))
-            w.bind("<Leave>", lambda e: w.configure(fg=self.theme["fg_dim"]))
+    def _up(self):
+        if self.on_up:
+            self.on_up()
+
+    def _build_crumbs(self):
+        for w in self._crumb_box.widget.winfo_children():
+            w.destroy()
+        for i, crumb in enumerate(self._crumbs):
+            if len(crumb) == 3:
+                name, payload, current = crumb
+            else:                                  # (label, is_current)
+                name, current = crumb
+                payload = None
+            if i:
+                IconLabel(self._crumb_box.widget, self.theme, "chevron-right",
+                          12, fg="fg_dim", bg="chip").pack(side="left", padx=s(2))
+            lb = Label(self._crumb_box.widget, self.theme, name,
+                       fg=("fg" if current else "fg_dim"), bg="chip", size=11,
+                       bold=current, cursor="hand2", padx=s(5), pady=s(9))
+            lb.widget.pack(side="left")
+            if not current:
+                w = lb.widget
+                w.bind("<Enter>", lambda e, ww=w: ww.configure(
+                    fg=self.theme["accent"]))
+                w.bind("<Leave>", lambda e, ww=w: ww.configure(
+                    fg=self.theme["fg_dim"]))
+                if self.on_crumb is not None:
+                    w.bind("<Button-1>", lambda e, p=payload: self.on_crumb(p))
+
+    def _build_badge(self):
+        for w in self._badge_box.widget.winfo_children():
+            w.destroy()
+        Badge(self._badge_box.widget, self.theme, self._count, bg="chip").pack()
 
     def _toggle(self):
         self.open = not self.open
@@ -116,14 +171,21 @@ class FolderNav:
         self._render()
 
     def _render(self):
-        for w in self.drop.widget.winfo_children():
-            w.destroy()
         if self.open:
-            folder_tree(self.drop.widget, self.theme, self.tree_rows,
-                        self.filter_text)
             self.drop.widget.pack(fill="x", pady=(s(6), 0))
         else:
             self.drop.widget.pack_forget()
+
+    def update(self, crumbs=None, tree_rows=None, count_text=None):
+        "Feed fresh data after a host-side navigate / expand / filter."
+        if crumbs is not None:
+            self._crumbs = crumbs
+            self._build_crumbs()
+        if count_text is not None:
+            self._count = count_text
+            self._build_badge()
+        if tree_rows is not None:
+            self.tree.set_rows(tree_rows)
 
     def pack(self, **k):
         self.box.pack(**k)
@@ -138,24 +200,73 @@ class FolderNav:
         return self
 
 
-def folder_tree(parent, theme, rows, filter_text=None):
-    outer = Surface(parent, theme, bg="border")
-    outer.widget.pack(fill="x")
-    panel = Surface(outer.widget, theme, bg="sidebar")
-    panel.widget.pack(fill="x", padx=s(1), pady=s(1))
-    p = panel.widget
-    if filter_text is not None:
-        _tree_filter(p, theme, filter_text)
-    else:
-        Label(p, theme, "Folders", fg="fg_dim", bg="sidebar", size=8,
-              bold=True, anchor="w").pack(fill="x", padx=s(12), pady=(s(8), s(4)))
-    for depth, name, kind, current in rows:
-        _tree_row(p, theme, depth, name, kind, current)
-    Surface(p, theme, bg="sidebar", height=s(8)).pack()
-    return panel
+class FolderTree:
+    """The tree body on its own: an optional live filter box above a column of
+    folder rows. The filter entry is persistent — call :meth:`set_rows` to
+    rebuild just the rows on navigate / expand / filter without stealing focus
+    from the box the user is typing in.
+
+        filter_text : placeholder for the filter box (None → a 'Folders' caption
+                      and no box)
+        on_row      : (payload) — a row's folder name / icon was clicked
+        on_toggle   : (payload) — a row's expand/collapse chevron was clicked
+        on_filter   : (text)    — every filter keystroke
+    """
+
+    def __init__(self, parent, theme, filter_text=None, on_row=None,
+                 on_toggle=None, on_filter=None):
+        self.theme = theme
+        self.on_row, self.on_toggle = on_row, on_toggle
+        self.box = Surface(parent, theme, bg="border")     # 1px hairline frame
+        panel = Surface(self.box.widget, theme, bg="sidebar")
+        panel.widget.pack(fill="x", padx=s(1), pady=s(1))
+        self.panel = panel.widget
+        if filter_text is not None:
+            self.filter_entry = _tree_filter(self.panel, theme, filter_text,
+                                             on_filter)
+        else:
+            self.filter_entry = None
+            Label(self.panel, theme, "Folders", fg="fg_dim", bg="sidebar",
+                  size=8, bold=True, anchor="w").pack(fill="x", padx=s(12),
+                                                      pady=(s(8), s(4)))
+        self.rows_box = Surface(self.panel, theme, bg="sidebar")
+        self.rows_box.widget.pack(fill="x")
+        Surface(self.panel, theme, bg="sidebar", height=s(8)).pack()
+
+    def set_rows(self, rows):
+        "Clear + rebuild the row column from (depth, name, kind, current[, payload])."
+        for w in self.rows_box.widget.winfo_children():
+            w.destroy()
+        for row in rows:
+            depth, name, kind, current = row[:4]
+            payload = row[4] if len(row) > 4 else None
+            _tree_row(self.rows_box.widget, self.theme, depth, name, kind,
+                      current, payload, self.on_row, self.on_toggle)
+
+    def pack(self, **k):
+        self.box.pack(**k)
+        return self
+
+    def grid(self, **k):
+        self.box.grid(**k)
+        return self
+
+    def place(self, **k):
+        self.box.place(**k)
+        return self
 
 
-def _tree_filter(parent, theme, text):
+def folder_tree(parent, theme, rows, filter_text=None, on_row=None,
+                on_toggle=None, on_filter=None):
+    "Functional shortcut: build a :class:`FolderTree`, fill it, pack it, return it."
+    ft = FolderTree(parent, theme, filter_text, on_row, on_toggle, on_filter)
+    ft.set_rows(rows)
+    ft.pack(fill="x")
+    return ft
+
+
+def _tree_filter(parent, theme, text, on_filter=None):
+    "The search row. A real Entry (with placeholder) when on_filter is given."
     box = Surface(parent, theme, bg="sidebar")
     box.widget.pack(fill="x", padx=s(10), pady=(s(8), s(6)))
     outer = Surface(box.widget, theme, bg="border")
@@ -166,29 +277,93 @@ def _tree_filter(parent, theme, text):
     row.widget.pack(fill="x", padx=s(8), pady=s(5))
     IconLabel(row.widget, theme, "search", 14, fg="fg_dim", bg="bg").pack(
         side="left", padx=(0, s(6)))
-    Label(row.widget, theme, text, fg="fg_dim", bg="bg", size=9).pack(side="left")
+    if on_filter is None:                          # static demo look, no input
+        Label(row.widget, theme, text, fg="fg_dim", bg="bg", size=9).pack(
+            side="left")
+        return None
+
+    ent = tk.Entry(row.widget, relief="flat", font=font(9), highlightthickness=0,
+                   bg=theme["bg"], fg=theme["fg"], insertbackground=theme["fg"])
+    ent.pack(side="left", fill="x", expand=True)
+    ph = {"on": False}                             # placeholder currently shown?
+
+    def show_ph():
+        ent.delete(0, "end")
+        ent.insert(0, text)
+        ent.configure(fg=theme["fg_dim"])
+        ph["on"] = True
+
+    def clear_ph():
+        if ph["on"]:
+            ent.delete(0, "end")
+            ent.configure(fg=theme["fg"])
+            ph["on"] = False
+
+    ent.bind("<FocusIn>", lambda e: clear_ph())
+    ent.bind("<FocusOut>", lambda e: (ent.get() or show_ph()))
+    ent.bind("<KeyRelease>", lambda e: on_filter("" if ph["on"] else ent.get()))
+    show_ph()
+
+    def restyle():
+        try:
+            ent.configure(bg=theme["bg"], insertbackground=theme["fg"],
+                          fg=theme["fg_dim"] if ph["on"] else theme["fg"])
+        except tk.TclError:
+            pass
+    theme.subscribe(restyle)
+    ent.bind("<Destroy>", lambda e: e.widget is ent and theme.unsubscribe(restyle))
+    return ent
 
 
-def _tree_row(parent, theme, depth, name, kind, current):
+def _tree_row(parent, theme, depth, name, kind, current, payload=None,
+              on_row=None, on_toggle=None):
     base = "lift" if current else "sidebar"
     row = Surface(parent, theme, bg=base)
     row.widget.pack(fill="x")
     Surface(row.widget, theme, bg=("accent" if current else base),
-            width=s(3)).pack(side="left", fill="y")
-    Surface(row.widget, theme, bg=base, width=s(4 + depth * 16)).pack(
-        side="left")
+            width=s(3)).pack(side="left", fill="y")          # selection strip
+    indent = Surface(row.widget, theme, bg=base, width=s(4 + depth * 16))
+    indent.widget.pack(side="left")
+    hover_cells = [row.widget, indent.widget]                # recoloured on hover
+
     if kind in ("open", "closed"):
-        IconLabel(row.widget, theme,
-                  "chevron-down" if kind == "open" else "chevron-right",
-                  12, fg="fg_dim", bg=base).pack(side="left")
+        chev = IconLabel(row.widget, theme,
+                         "chevron-down" if kind == "open" else "chevron-right",
+                         12, fg="fg_dim", bg=base)
+        chev.widget.pack(side="left")
+        hover_cells.append(chev.widget)
+        if on_toggle is not None:
+            chev.widget.configure(cursor="hand2")
+            chev.widget.bind("<Button-1>", lambda e, p=payload: on_toggle(p))
     else:
-        Surface(row.widget, theme, bg=base, width=s(12)).pack(side="left")
-    IconLabel(row.widget, theme, "folder-open", 14,
-              fg=("accent" if current else "fg"), bg=base).pack(side="left",
-                                                                padx=(s(2), 0))
-    Label(row.widget, theme, name, fg=("accent" if current else "fg"), bg=base,
-          size=10, bold=current, cursor="hand2", padx=s(6)).pack(side="left",
-                                                                 pady=0)
+        gap = Surface(row.widget, theme, bg=base, width=s(12))
+        gap.widget.pack(side="left")
+        hover_cells.append(gap.widget)
+
+    ic = IconLabel(row.widget, theme, "folder-open", 14,
+                   fg=("accent" if current else "fg"), bg=base)
+    ic.widget.pack(side="left", padx=(s(2), 0))
+    lbl = Label(row.widget, theme, name, fg=("accent" if current else "fg"),
+                bg=base, size=10, bold=current, cursor="hand2", padx=s(6))
+    lbl.widget.pack(side="left", pady=0)
+    hover_cells += [ic.widget, lbl.widget]
+
+    if on_row is not None:
+        row.widget.configure(cursor="hand2")
+        for w in (row.widget, indent.widget, ic.widget, lbl.widget):
+            w.bind("<Button-1>", lambda e, p=payload: on_row(p))
+
+    def enter(_e):
+        for w in hover_cells:
+            w.configure(bg=theme["hover"])
+
+    def leave(_e):
+        for w in hover_cells:
+            w.configure(bg=theme[base])
+    for w in hover_cells:
+        w.bind("<Enter>", enter)
+        w.bind("<Leave>", leave)
+    return row
 
 
 # ----------------------------------------------------------------------------

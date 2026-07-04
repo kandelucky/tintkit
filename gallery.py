@@ -235,16 +235,67 @@ def _tags(p, theme):
 
 def build_nav(parent, theme):
     box = Surface(parent, theme, bg="bg")
-    caption(box.widget, theme, "Folder navigation — a path bar + a collapsible "
-            "folder tree (▾ opens it · ↑ goes up).").pack(anchor="w",
-                                                          pady=(0, 10))
-    FolderNav(box.widget, theme,
-              crumbs=[("Home", False), ("Photos", False), ("2024", True)],
-              tree_rows=[(0, "Home", "open", False), (1, "Photos", "open", False),
-                         (2, "2023", "closed", False), (2, "2024", "open", True),
-                         (3, "Wedding", "leaf", False), (3, "Trip", "leaf", False),
-                         (1, "Documents", "closed", False)],
-              count_text="248 photos").pack(fill="x")
+    caption(box.widget, theme, "Folder navigation — click a folder to open · "
+            "▸ expands · ↑ goes up · type to filter.").pack(anchor="w",
+                                                            pady=(0, 10))
+
+    # A tiny in-memory tree so the demo genuinely navigates, expands and filters.
+    KIDS = {"Home": ["Photos", "Documents"], "Photos": ["2023", "2024"],
+            "2024": ["Wedding", "Trip"]}
+    PARENT = {c: p for p, cs in KIDS.items() for c in cs}
+    state = {"expanded": {"Home", "Photos", "2024"}, "current": "2024",
+             "filter": ""}
+
+    def rows():
+        out = []
+
+        def walk(name, depth):
+            kids = KIDS.get(name, [])
+            kind = ("open" if name in state["expanded"] else "closed") if kids \
+                else "leaf"
+            flt = state["filter"]
+            if not flt or flt in name.lower():
+                out.append((depth, name, kind, name == state["current"], name))
+            if kids and (name in state["expanded"] or flt):
+                for k in kids:
+                    walk(k, depth + 1)
+
+        walk("Home", 0)
+        return out
+
+    def crumbs():
+        chain, n = [], state["current"]
+        while n is not None:
+            chain.append(n)
+            n = PARENT.get(n)
+        chain.reverse()
+        return [(nm, nm, nm == state["current"]) for nm in chain]
+
+    def count():
+        return f"{len(KIDS.get(state['current'], []))} folders"
+
+    def open_folder(name):
+        state["current"] = name
+        state["expanded"].add(name)
+        nav.update(crumbs=crumbs(), tree_rows=rows(), count_text=count())
+
+    def toggle(name):
+        state["expanded"].symmetric_difference_update({name})
+        nav.update(tree_rows=rows())
+
+    def go_up():
+        p = PARENT.get(state["current"])
+        if p is not None:
+            open_folder(p)
+
+    def do_filter(text):
+        state["filter"] = text.lower().strip()
+        nav.update(tree_rows=rows())     # crumbs untouched → filter box keeps focus
+
+    nav = FolderNav(box.widget, theme, crumbs(), rows(), count(),
+                    on_up=go_up, on_crumb=open_folder, on_row=open_folder,
+                    on_toggle=toggle, on_filter=do_filter)
+    nav.pack(fill="x")
     return box
 
 
