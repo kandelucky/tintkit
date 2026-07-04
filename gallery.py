@@ -470,14 +470,53 @@ def build_panels(parent, theme):
 def build_settings(parent, theme):
     box = Surface(parent, theme, bg="bg")
     caption(box.widget, theme, "The Settings window — a left tab rail "
-            "(General · Export · Culling · About) + a live pane.").pack(
+            "(General · Export · Culling · About) + a live, scrollable pane. "
+            "The app supplies the tabs + content; the kit draws the chrome.").pack(
                 anchor="w", pady=(0, 10))
     stage = tk.Frame(box.widget, bg=theme["scrim"], height=s(460))
     stage.pack(fill="x")
     stage.pack_propagate(False)
     theme.subscribe(lambda: stage.winfo_exists() and stage.configure(
         bg=theme["scrim"]))
-    SettingsWindow(stage, theme, width=600, height=420).pack(pady=s(20))
+
+    def general(win):
+        win.group("General")
+        Toggle(win.row("Dark theme"), theme, value=True, bg="panel").pack()
+        Toggle(win.row("Confirm before delete"), theme, value=True,
+               bg="panel").pack()
+        Dropdown(win.row("Thumbnail size"), theme, ["Small", "Medium", "Large"],
+                 selected=2, bg="panel").pack()
+
+    def export(win):
+        win.group("Export")
+        SegmentedTabs(win.row("Format"), theme, ["JPG", "PNG", "TIFF"],
+                      bg="panel").pack()
+        Slider(win.body.widget, theme, "Quality", value=85, lo=0, hi=100,
+               neutral=0, bg="panel").pack(fill="x", pady=(s(8), 0))
+        Toggle(win.row("Convert to sRGB"), theme, value=True, bg="panel").pack()
+
+    def culling(win):
+        win.group("Culling")
+        Toggle(win.row("Keep on right arrow"), theme, value=False,
+               bg="panel").pack()
+        Dropdown(win.row("Reject folder name"), theme,
+                 ["Rejected", "Trash", "_cull"], bg="panel").pack()
+
+    def about(win):
+        win.group("About")
+        Label(win.body.widget, theme, "TintKit — a themeable Tkinter UI kit.",
+              fg="fg_dim", bg="panel", size=10, justify="left").pack(
+                  anchor="w", pady=(s(4), s(12)))
+        Button(win.body.widget, theme, "Check for updates", role="neutral",
+               variant="outline", bg="panel").pack(anchor="w")
+
+    card = Card(stage, theme, pad=0, bg="panel", width=s(600))
+    card.pack(pady=s(20))
+    SettingsWindow(card.body, theme, width=600, height=420, pane_bg="panel",
+                   tabs=[("general", "General", None, general),
+                         ("export", "Export", None, export),
+                         ("culling", "Culling", None, culling),
+                         ("about", "About", None, about)]).pack()
     return box
 
 

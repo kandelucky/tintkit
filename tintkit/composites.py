@@ -15,7 +15,7 @@ from .primitives import Surface, Label, IconLabel, rounded_rect, put_icon, font
 from . import icons
 from .controls import (IconButton, Toggle, Dropdown, SegmentedTabs, Slider,
                        Button, Badge)
-from .containers import Card, SectionHeader
+from .containers import Card, SectionHeader, themed_scrollbar
 
 
 # ----------------------------------------------------------------------------
@@ -346,114 +346,221 @@ def multiselect_list(parent, theme, rows, width=240):
 
 
 # ----------------------------------------------------------------------------
-# Settings window — a left tab rail + a swappable pane (kit-built)
+# Settings window — a left tab rail + a swappable, scrollable content pane
 # ----------------------------------------------------------------------------
 class SettingsWindow:
-    TABS = ["General", "Export", "Culling", "About"]
+    """A left tab-rail beside a swappable, scrollable content pane.
 
-    def __init__(self, parent, theme, width=560, height=400):
+    App-agnostic chrome. You supply the ``tabs`` and one *builder* per tab; the
+    kit draws the rail (accent active row, optional icon), scrolls the pane, and
+    hands each builder this object so it can lay content out with :meth:`group`
+    / :meth:`row` / :meth:`note` and re-run itself with :meth:`rebuild`. It owns
+    no window of its own — pack/grid/place ``.root`` into a :class:`Card` (a
+    gallery) or a ``Toplevel`` body (an app); the header/footer, if any, belong
+    to the host.
+
+        def general(win):
+            win.group("Language")
+            Dropdown(win.row("Interface language"), theme, langs).pack()
+
+        SettingsWindow(parent, theme, tabs=[
+            ("general", "General", "settings", general), ...],
+        ).pack(fill="both", expand=True)
+
+    Parameters
+    ----------
+    tabs        list of ``(key, label, icon_or_None, builder)``. ``builder`` is
+                called with this SettingsWindow whenever its tab is shown; it
+                fills ``win.body`` (usually via :meth:`group` / :meth:`row`).
+    icon_loader ``(name, px, colour) -> image | None`` for the rail glyphs,
+                given a *logical* px size (it DPI-scales itself). Defaults to the
+                kit's own :func:`icons.load`; pass the app's loader to draw from
+                its icon set. Ignored for text-only tabs (``icon`` is ``None``).
+    rail_bg /   theme tokens for the rail and content backgrounds (a gallery
+    pane_bg     shows it on a ``"panel"`` card, an app on the window ``"bg"``).
+    header      a small caption above the tabs, or ``None`` for none.
+    width /     fixed size in logical px; omit either to fill the parent on that
+    height      axis (an app in a resizable window passes neither).
+    """
+
+    def __init__(self, parent, theme, tabs, width=None, height=None,
+                 rail_w=150, header="SETTINGS", icon_loader=None,
+                 rail_bg="sidebar", pane_bg="bg"):
         self.theme = theme
-        self.active = 0
-        self._tabs = []
-        card = Card(theme=theme, parent=parent, pad=0, bg="panel", width=s(width))
-        self.card = card
-        body = card.body
-        body.configure(height=s(height))
-        body.pack_propagate(False)
-        rail = Surface(body, theme, bg="sidebar")
-        rail.widget.pack(side="left", fill="y")
-        rail.widget.configure(width=s(140))
-        rail.widget.pack_propagate(False)
-        Label(rail.widget, theme, "  SETTINGS", fg="fg_dim", bg="sidebar",
-              size=8, bold=True, anchor="w").pack(fill="x", pady=(s(16), s(8)))
-        for i, name in enumerate(self.TABS):
-            self._tab(rail.widget, i, name)
-        self.pane = Surface(body, theme, bg="panel")
-        self.pane.widget.pack(side="left", fill="both", expand=True,
-                              padx=s(20), pady=s(16))
-        self._show(0)
+        self.tabs = tabs
+        self.active = tabs[0][0]
+        self._icon = icon_loader or icons.load
+        self._rail_bg, self._pane_bg = rail_bg, pane_bg
+        self._rows = {}                      # key -> (row, stripe, ic, lbl, name)
+        self.body = None
 
-    def _tab(self, parent, i, name):
-        row = Surface(parent, self.theme, bg="sidebar")
-        row.widget.pack(fill="x")
-        stripe = Surface(row.widget, self.theme, bg="sidebar", width=s(3))
-        stripe.widget.pack(side="left", fill="y")
-        lbl = Label(row.widget, self.theme, name, fg="fg_dim", bg="sidebar",
-                    size=10, cursor="hand2", anchor="w", padx=s(12), pady=s(8))
-        lbl.widget.pack(side="left", fill="x", expand=True)
-        self._tabs.append((stripe, lbl))
-        for w in (row.widget, lbl.widget):
-            w.bind("<Button-1>", lambda e, idx=i: self._show(idx))
+        root = tk.Frame(parent, bg=theme[pane_bg])
+        self.root = root
+        if width:
+            root.configure(width=s(width))
+        if height:
+            root.configure(height=s(height))
+        if width or height:
+            root.pack_propagate(False)
 
-    def _show(self, i):
-        self.active = i
-        for j, (stripe, lbl) in enumerate(self._tabs):
-            on = (j == i)
-            stripe._bg = "accent" if on else "sidebar"
-            stripe._restyle()
-            lbl._fg = "accent" if on else "fg_dim"
-            lbl.widget.configure(font=font(10, on))
-            lbl._restyle()
-        for w in self.pane.widget.winfo_children():
+        # LEFT — the tab rail.
+        rail = tk.Frame(root, bg=theme[rail_bg], width=s(rail_w))
+        rail.pack(side="left", fill="y")
+        rail.pack_propagate(False)
+        self._rail = rail
+        self._header = None
+        if header:
+            self._header = tk.Label(rail, text="  " + header, anchor="w",
+                                    bg=theme[rail_bg], fg=theme["fg_dim"],
+                                    font=font(8, True))
+            self._header.pack(fill="x", pady=(s(16), s(8)))
+        else:
+            tk.Frame(rail, bg=theme[rail_bg], height=s(8)).pack(fill="x")
+        for key, label, icon, _b in tabs:
+            self._make_row(rail, key, label, icon)
+
+        self._divider = tk.Frame(root, width=s(1), bg=theme["border"])
+        self._divider.pack(side="left", fill="y")
+
+        # RIGHT — a scrollable content pane.
+        right = tk.Frame(root, bg=theme[pane_bg])
+        right.pack(side="left", fill="both", expand=True)
+        self.canvas = tk.Canvas(right, highlightthickness=0, bg=theme[pane_bg])
+        sb = themed_scrollbar(right, theme, self.canvas.yview)
+        self.canvas.configure(yscrollcommand=sb.set)
+        sb.pack(side="right", fill="y")
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.pane = tk.Frame(self.canvas, bg=theme[pane_bg])
+        self._win = self.canvas.create_window((0, 0), window=self.pane,
+                                              anchor="nw")
+        self.pane.bind("<Configure>", lambda e: self.canvas.configure(
+            scrollregion=self.canvas.bbox("all")))
+        self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfigure(
+            self._win, width=e.width))
+        self.canvas.bind("<MouseWheel>", lambda e: self.canvas.yview_scroll(
+            int(-e.delta / 120), "units"))
+
+        theme.subscribe(self._paint)
+        root.bind("<Destroy>", self._destroyed)
+        self.show(self.active)
+
+    # -- rail ---------------------------------------------------------------
+    def _make_row(self, parent, key, label, name):
+        side = self.theme[self._rail_bg]
+        row = tk.Frame(parent, bg=side, cursor="hand2")
+        row.pack(fill="x")
+        stripe = tk.Frame(row, bg=side, width=s(3))
+        stripe.pack(side="left", fill="y")
+        ic = None
+        if name:
+            ic = tk.Label(row, bg=side)
+            ic.pack(side="left", padx=(s(12), s(9)), pady=s(9))
+            lbl = tk.Label(row, text=label, bg=side, fg=self.theme["fg_dim"],
+                           anchor="w", font=font(10))
+            lbl.pack(side="left", fill="x", expand=True)
+        else:
+            lbl = tk.Label(row, text=label, bg=side, fg=self.theme["fg_dim"],
+                           anchor="w", font=font(10), padx=s(14), pady=s(9))
+            lbl.pack(side="left", fill="x", expand=True)
+        self._rows[key] = (row, stripe, ic, lbl, name)
+        for w in [row, stripe, lbl] + ([ic] if ic else []):
+            w.bind("<Button-1>", lambda e, k=key: self.show(k))
+            w.bind("<Enter>", lambda e, k=key: self._hover(k, True))
+            w.bind("<Leave>", lambda e, k=key: self._hover(k, False))
+
+    def _hover(self, key, on):
+        if key == self.active:
+            return
+        row, stripe, ic, lbl, _n = self._rows[key]
+        bg = self.theme["hover"] if on else self.theme[self._rail_bg]
+        for w in [row, stripe, lbl] + ([ic] if ic else []):
+            w.configure(bg=bg)
+
+    def _paint(self):
+        "Repaint the rail + chrome for the active tab / theme (a live subscriber)."
+        try:
+            side, pane = self.theme[self._rail_bg], self.theme[self._pane_bg]
+            self.root.configure(bg=pane)
+            self._rail.configure(bg=side)
+            self._divider.configure(bg=self.theme["border"])
+            self.canvas.configure(bg=pane)
+            self.pane.configure(bg=pane)
+            if self._header is not None:
+                self._header.configure(bg=side, fg=self.theme["fg_dim"])
+            for key, (row, stripe, ic, lbl, name) in self._rows.items():
+                on = (key == self.active)
+                col = self.theme["accent"] if on else self.theme["fg_dim"]
+                for w in [row, lbl] + ([ic] if ic else []):
+                    w.configure(bg=side)
+                stripe.configure(bg=self.theme["accent"] if on else side)
+                lbl.configure(fg=col, font=font(10, on))
+                if ic is not None:
+                    img = self._icon(name, 17, col)
+                    if img is not None:
+                        ic.configure(image=img)
+                        ic.image = img               # keep a hard ref alive
+        except tk.TclError:
+            pass
+
+    def _destroyed(self, e):
+        if e.widget is self.root:
+            self.theme.unsubscribe(self._paint)
+
+    # -- content ------------------------------------------------------------
+    def show(self, key):
+        "Switch to tab ``key``: repaint the rail, rebuild the pane, scroll to top."
+        self.active = key
+        self._paint()
+        for w in self.pane.winfo_children():
             w.destroy()
-        [self._general, self._export, self._culling, self._about][i]()
+        self.body = Surface(self.pane, self.theme, bg=self._pane_bg)
+        self.body.widget.pack(fill="both", expand=True,
+                              padx=s(22), pady=(s(4), s(20)))
+        builder = next(b for k, _l, _i, b in self.tabs if k == key)
+        builder(self)
+        self.canvas.yview_moveto(0.0)
 
-    # -- panes -------------------------------------------------------------
-    def _row(self, label, control_factory):
-        r = Surface(self.pane.widget, self.theme, bg="panel")
+    def rebuild(self):
+        "Re-run the active tab's builder (e.g. after a control changes layout)."
+        self.show(self.active)
+
+    # -- content helpers (used by the tab builders) -------------------------
+    def group(self, title):
+        "A section header (accent tick + title + rule) titling a block."
+        return SectionHeader(self.body.widget, self.theme, title,
+                             bg=self._pane_bg).pack(fill="x", pady=(s(18), s(2)))
+
+    def row(self, title, desc=None):
+        "One setting line — title (+ optional description) left, controls right."
+        " Returns the right-hand frame; pack the control(s) into it."
+        r = Surface(self.body.widget, self.theme, bg=self._pane_bg)
         r.widget.pack(fill="x", pady=s(6))
-        Label(r.widget, self.theme, label, fg="fg", bg="panel", size=10).pack(
-            side="left")
-        control_factory(r.widget).pack(side="right")
+        left = Surface(r.widget, self.theme, bg=self._pane_bg)
+        left.widget.pack(side="left", fill="x", expand=True)
+        Label(left.widget, self.theme, title, fg="fg", bg=self._pane_bg,
+              size=10, anchor="w").pack(anchor="w")
+        if desc:
+            Label(left.widget, self.theme, desc, fg="fg_dim", bg=self._pane_bg,
+                  size=8, anchor="w", justify="left",
+                  wraplength=s(330)).pack(anchor="w", pady=(s(2), 0))
+        right = Surface(r.widget, self.theme, bg=self._pane_bg)
+        right.widget.pack(side="right", padx=(s(16), 0))
+        return right.widget
 
-    def _general(self):
-        SectionHeader(self.pane.widget, self.theme, "General", bg="panel").pack(
-            fill="x")
-        self._row("Dark theme", lambda p: Toggle(p, self.theme, value=True,
-                                                 bg="panel"))
-        self._row("Confirm before delete",
-                  lambda p: Toggle(p, self.theme, value=True, bg="panel"))
-        self._row("Thumbnail size",
-                  lambda p: Dropdown(p, self.theme, ["Small", "Medium", "Large"],
-                                     selected=2, bg="panel"))
-
-    def _export(self):
-        SectionHeader(self.pane.widget, self.theme, "Export", bg="panel").pack(
-            fill="x")
-        self._row("Format", lambda p: SegmentedTabs(p, self.theme,
-                                                    ["JPG", "PNG", "TIFF"],
-                                                    bg="panel"))
-        Slider(self.pane.widget, self.theme, "Quality", value=85, lo=0, hi=100,
-               neutral=0, bg="panel").pack(fill="x", pady=(s(8), 0))
-        self._row("Convert to sRGB",
-                  lambda p: Toggle(p, self.theme, value=True, bg="panel"))
-
-    def _culling(self):
-        SectionHeader(self.pane.widget, self.theme, "Culling", bg="panel").pack(
-            fill="x")
-        self._row("Keep on right arrow",
-                  lambda p: Toggle(p, self.theme, value=False, bg="panel"))
-        self._row("Reject folder name",
-                  lambda p: Dropdown(p, self.theme, ["Rejected", "Trash",
-                                                    "_cull"], bg="panel"))
-
-    def _about(self):
-        SectionHeader(self.pane.widget, self.theme, "About", bg="panel").pack(
-            fill="x")
-        Label(self.pane.widget, self.theme, "TintKit — a themeable Tkinter "
-              "UI kit.", fg="fg_dim", bg="panel", size=10,
-              justify="left").pack(anchor="w", pady=(s(4), s(12)))
-        Button(self.pane.widget, self.theme, "Check for updates",
-               role="neutral", variant="outline", bg="panel").pack(anchor="w")
+    def note(self, text):
+        "A small dim explanatory line under a block."
+        return Label(self.body.widget, self.theme, text, fg="fg_dim",
+                     bg=self._pane_bg, size=8, anchor="w", justify="left",
+                     wraplength=s(440)).pack(fill="x", pady=(s(10), 0))
 
     def pack(self, **k):
-        self.card.pack(**k)
+        self.root.pack(**k)
         return self
 
     def grid(self, **k):
-        self.card.grid(**k)
+        self.root.grid(**k)
         return self
 
     def place(self, **k):
-        self.card.place(**k)
+        self.root.place(**k)
         return self
