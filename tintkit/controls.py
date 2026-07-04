@@ -39,6 +39,7 @@ class Button(CanvasControl):
         self.disabled = disabled
         self.command = command
         self.stretch = stretch
+        self._focused = False
         bold = (variant == "filled")
         iw = s(22) if icon else 0
         w = max(s(min_w), int(s(28) + measure(9, label, bold) + iw))
@@ -46,11 +47,30 @@ class Button(CanvasControl):
                          cursor="" if disabled else "hand2")
         if not disabled and command:
             self.canvas.bind("<Button-1>", lambda e: self.command())
+            self.canvas.configure(takefocus=1)      # reachable by Tab / arrows
+            self.canvas.bind("<FocusIn>", self._focus_in)
+            self.canvas.bind("<FocusOut>", self._focus_out)
+            self.canvas.bind("<Return>", self._activate)
+            self.canvas.bind("<space>", self._activate)
         if stretch:
             self.canvas.bind("<Configure>", self._on_stretch)
 
     def _interactive(self):
         return not self.disabled
+
+    def _focus_in(self, _e):
+        self._focused = True
+        self.repaint()
+
+    def _focus_out(self, _e):
+        self._focused = False
+        self.repaint()
+
+    def _activate(self, _e):
+        "Enter / Space fire the button; ``break`` stops a dialog-level <Return>."
+        if self.command:
+            self.command()
+        return "break"
 
     def _on_stretch(self, e):
         if e.width > 4 and e.width != self.w:
@@ -109,6 +129,9 @@ class Button(CanvasControl):
                           fill=fg, font=font(9, bold))
         else:
             c.create_text(cx, cy, text=self.label, fill=fg, font=font(9, bold))
+        if self._focused and not self.disabled:     # keyboard focus ring
+            rounded_rect(c, s(2), s(2), self.w - s(2), self.h - s(2),
+                         max(0, r - s(1)), fill="", outline=t["fg"], width=s(2))
 
 
 # ----------------------------------------------------------------------------

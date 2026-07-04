@@ -362,6 +362,7 @@ class CanvasControl:
         self.canvas = tk.Canvas(parent, width=width, height=height,
                                 bg=theme[bg], highlightthickness=0,
                                 cursor=cursor)
+        self.canvas.tk_control = self       # back-ref: control from its canvas
         self.canvas.bind("<Enter>", self._enter)
         self.canvas.bind("<Leave>", self._leave)
         self.canvas.bind("<Destroy>", self._destroyed)
