@@ -211,12 +211,13 @@ class FolderTree:
         on_row      : (payload) — a row's folder name / icon was clicked
         on_toggle   : (payload) — a row's expand/collapse chevron was clicked
         on_filter   : (text)    — every filter keystroke
+        on_context  : (payload, event) — a row was right-clicked
     """
 
     def __init__(self, parent, theme, filter_text=None, on_row=None,
-                 on_toggle=None, on_filter=None):
+                 on_toggle=None, on_filter=None, on_context=None):
         self.theme = theme
-        self.on_row, self.on_toggle = on_row, on_toggle
+        self.on_row, self.on_toggle, self.on_context = on_row, on_toggle, on_context
         self.box = Surface(parent, theme, bg="border")     # 1px hairline frame
         panel = Surface(self.box.widget, theme, bg="sidebar")
         panel.widget.pack(fill="x", padx=s(1), pady=s(1))
@@ -241,7 +242,8 @@ class FolderTree:
             depth, name, kind, current = row[:4]
             payload = row[4] if len(row) > 4 else None
             _tree_row(self.rows_box.widget, self.theme, depth, name, kind,
-                      current, payload, self.on_row, self.on_toggle)
+                      current, payload, self.on_row, self.on_toggle,
+                      self.on_context)
 
     def pack(self, **k):
         self.box.pack(**k)
@@ -257,9 +259,10 @@ class FolderTree:
 
 
 def folder_tree(parent, theme, rows, filter_text=None, on_row=None,
-                on_toggle=None, on_filter=None):
+                on_toggle=None, on_filter=None, on_context=None):
     "Functional shortcut: build a :class:`FolderTree`, fill it, pack it, return it."
-    ft = FolderTree(parent, theme, filter_text, on_row, on_toggle, on_filter)
+    ft = FolderTree(parent, theme, filter_text, on_row, on_toggle, on_filter,
+                    on_context)
     ft.set_rows(rows)
     ft.pack(fill="x")
     return ft
@@ -316,7 +319,7 @@ def _tree_filter(parent, theme, text, on_filter=None):
 
 
 def _tree_row(parent, theme, depth, name, kind, current, payload=None,
-              on_row=None, on_toggle=None):
+              on_row=None, on_toggle=None, on_context=None):
     base = "lift" if current else "sidebar"
     row = Surface(parent, theme, bg=base)
     row.widget.pack(fill="x")
@@ -352,6 +355,14 @@ def _tree_row(parent, theme, depth, name, kind, current, payload=None,
         row.widget.configure(cursor="hand2")
         for w in (row.widget, indent.widget, ic.widget, lbl.widget):
             w.bind("<Button-1>", lambda e, p=payload: on_row(p))
+
+    if on_context is not None:
+        def _ctx(e, p=payload):
+            on_context(p, e)
+        for w in hover_cells:
+            w.bind("<Button-3>", _ctx)   # Windows / Linux right-click
+            w.bind("<Button-2>", _ctx)   # macOS: Tk's Aqua port fires the
+                                         # secondary click as Button-2, not -3
 
     def enter(_e):
         for w in hover_cells:
