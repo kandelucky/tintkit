@@ -97,7 +97,9 @@ class Button(CanvasControl):
         fg = self._fg()
         cx, cy = self.w / 2, self.h / 2
         bold = (self.variant == "filled")
-        if self.icon_name:
+        if self.icon_name and not self.label:      # icon-only: center it, no text gap
+            put_icon(c, cx, cy, icons.load(self.icon_name, 16, fg))
+        elif self.icon_name:
             ic = icons.load(self.icon_name, 16, fg)
             iw = ic.width() if ic else s(16)
             total = iw + s(6) + measure(9, self.label, bold)
