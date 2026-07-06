@@ -97,6 +97,76 @@ class Card:
 
 
 # ----------------------------------------------------------------------------
+# Foldout — a bordered group that folds shut around its content
+# ----------------------------------------------------------------------------
+class Foldout:
+    """A square-cornered, hairline-bordered group that folds: a chevron + small
+    bold caption sit INSIDE the border, clicking the header shows or hides
+    ``body``, and the box grows around the content — a collapsible sibling of
+    the boxed tool-panel card.
+
+        fo = Foldout(panel, theme, "Quality", bg="bar")
+        TitledSlider(fo.body, theme, "Strength").pack(fill="x")
+        fo.pack(fill="x")
+
+    ``open`` picks the initial state. ``on_toggle(open)`` fires after every
+    header click (not after ``set_open``, so code can drive the fold without
+    echoing the callback)."""
+
+    def __init__(self, parent, theme, title, open=False, bg="panel",
+                 on_toggle=None):
+        self.theme = theme
+        self.open = open
+        self.on_toggle = on_toggle
+        self.box = tk.Frame(parent, bg=theme[bg], highlightthickness=s(1))
+        theme_frame(theme, self.box, bg=bg, highlightbackground="border")
+        head = tk.Frame(self.box, bg=theme[bg], cursor="hand2")
+        theme_frame(theme, head, bg=bg)
+        head.pack(fill="x", padx=s(9), pady=s(7))
+        self._chev = IconLabel(head, theme, "chevron-right", 12, fg="fg_dim",
+                               bg=bg)
+        self._chev.widget.pack(side="left", padx=(0, s(6)))
+        cap = Label(head, theme, title, fg="fg_dim", bg=bg, size=8, bold=True)
+        cap.widget.pack(side="left")
+        # body sits in its own holder so folding is one pack/forget, whatever
+        # the caller stacked inside
+        self._holder = Surface(self.box, theme, bg=bg)
+        inner = Surface(self._holder.widget, theme, bg=bg)
+        inner.widget.pack(fill="x", padx=s(10), pady=(0, s(9)))
+        self.body = inner.widget
+        for w in (head, self._chev.widget, cap.widget):
+            w.bind("<Button-1>", self.toggle)
+        self._refresh()
+
+    def toggle(self, _e=None):
+        "Flip open/closed (the header click) and report it to ``on_toggle``."
+        self.set_open(not self.open)
+        if self.on_toggle:
+            self.on_toggle(self.open)
+
+    def set_open(self, open):
+        "Drive the fold from code — no ``on_toggle`` echo."
+        self.open = bool(open)
+        self._refresh()
+
+    def _refresh(self):
+        self._chev.set_icon("chevron-down" if self.open else "chevron-right")
+        if self.open:
+            if not self._holder.widget.winfo_manager():
+                self._holder.widget.pack(fill="x")
+        else:
+            self._holder.widget.pack_forget()
+
+    def pack(self, **k):
+        self.box.pack(**k)
+        return self
+
+    def grid(self, **k):
+        self.box.grid(**k)
+        return self
+
+
+# ----------------------------------------------------------------------------
 # Section header — accent tick + title + divider rule
 # ----------------------------------------------------------------------------
 class SectionHeader(CanvasControl):
