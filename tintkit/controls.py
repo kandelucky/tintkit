@@ -578,11 +578,12 @@ class HoverTip:
         HoverTip(save_btn.canvas, theme, "Save (Ctrl+S)")
     """
 
-    def __init__(self, widget, theme, text, delay=450):
+    def __init__(self, widget, theme, text, delay=450, wrap=None):
         self.widget = widget
         self.theme = theme
         self.text = text
         self.delay = delay
+        self.wrap = wrap          # max line width (logical px) before wrapping
         self.tip = None
         self._job = None
         # add="+" so we never clobber the widget's own hover / click bindings.
@@ -629,10 +630,15 @@ class HoverTip:
         lbl = tk.Label(self.tip, text=self.text, bg=t["tooltip"],
                        fg=on_color(t["tooltip"]), font=font(9),
                        padx=s(8), pady=s(3))
+        if self.wrap:                               # long tips wrap to N lines
+            lbl.configure(wraplength=s(self.wrap), justify="left")
         lbl.pack(padx=s(1), pady=s(1))
         self.tip.update_idletasks()
         w = self.tip.winfo_width()
-        self.tip.wm_geometry(f"+{x - w // 2}+{y}")
+        left = x - w // 2
+        sw = self.tip.winfo_screenwidth()           # keep the whole tip on-screen
+        left = max(s(4), min(left, sw - w - s(4)))
+        self.tip.wm_geometry(f"+{left}+{y}")
 
     def _hide(self, _e=None):
         self._cancel()
