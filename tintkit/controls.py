@@ -884,12 +884,13 @@ class Dropdown(CanvasControl):
     or ``(label, icon_name)`` pairs."""
 
     def __init__(self, parent, theme, options, selected=0, command=None,
-                 mark="both", min_w=170, bg="bg"):
+                 mark="both", min_w=170, bg="bg", stretch=False):
         self.options = [(o, None) if isinstance(o, str) else tuple(o)
                         for o in options]
         self.selected = selected
         self.command = command
         self.mark = mark
+        self.stretch = stretch
         self._open = False
         self._popup = None
         self._has_icons = any(ic for _, ic in self.options)
@@ -898,6 +899,13 @@ class Dropdown(CanvasControl):
                 + s(34))
         super().__init__(parent, theme, w, s(32), bg=bg)
         self.canvas.bind("<Button-1>", lambda e: self.toggle())
+        if stretch:                             # fill the host's width (pack fill="x")
+            self.canvas.bind("<Configure>", self._on_stretch)
+
+    def _on_stretch(self, e):
+        if e.width > 4 and e.width != self.w:
+            self.w = e.width
+            self.repaint()
 
     # -- trigger -----------------------------------------------------------
     def draw(self):
