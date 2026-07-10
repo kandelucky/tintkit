@@ -17,9 +17,9 @@ import tkinter.ttk as ttk
 
 from .scaling import s
 from .theme import mix
-from .primitives import (CanvasControl, Surface, Label, IconLabel,
+from .primitives import (CanvasControl, Dot, Surface, Label, IconLabel,
                          rounded_rect, font)
-from .controls import Button, TextField
+from .controls import Button, HoverTip, TextField
 
 
 # ----------------------------------------------------------------------------
@@ -111,10 +111,14 @@ class Foldout:
 
     ``open`` picks the initial state. ``on_toggle(open)`` fires after every
     header click (not after ``set_open``, so code can drive the fold without
-    echoing the callback)."""
+    echoing the callback). ``dot`` grades the whole group with a small coloured
+    circle between the chevron and the caption (``dot_tip`` is its hover text) —
+    use it when the grade belongs to the section, not to each control inside it.
+    ``dot_slot`` keeps that column on an ungraded group, so a stack of Foldouts
+    lines its captions up; ``set_dot_slot(False)`` gives the column back."""
 
     def __init__(self, parent, theme, title, open=False, bg="panel",
-                 on_toggle=None):
+                 on_toggle=None, dot=None, dot_tip="", dot_slot=False):
         self.theme = theme
         self.open = open
         self.on_toggle = on_toggle
@@ -126,17 +130,47 @@ class Foldout:
         self._chev = IconLabel(head, theme, "chevron-right", 12, fg="fg_dim",
                                bg=bg)
         self._chev.widget.pack(side="left", padx=(0, s(6)))
+        # The dot leads the caption (it only trails the chevron, which is a
+        # fixed width) so the badge sits in a column, not at the end of a title
+        # whose length nobody controls. An ungraded group holds the column blank.
+        self._dot = None
+        if dot or dot_slot:
+            self._dot = Dot(head, theme, dot, bg=bg)
+            self._dot.pack(side="left", padx=(0, s(6)))
+            if dot_tip:
+                HoverTip(self._dot.widget, theme, dot_tip)
         cap = Label(head, theme, title, fg="fg_dim", bg=bg, size=8, bold=True)
         cap.widget.pack(side="left")
+        self._dot_before = cap.widget
         # body sits in its own holder so folding is one pack/forget, whatever
         # the caller stacked inside
         self._holder = Surface(self.box, theme, bg=bg)
         inner = Surface(self._holder.widget, theme, bg=bg)
         inner.widget.pack(fill="x", padx=s(10), pady=(0, s(9)))
         self.body = inner.widget
+        # The dot toggles the fold too, so it is not a dead spot in the header.
         for w in (head, self._chev.widget, cap.widget):
             w.bind("<Button-1>", self.toggle)
+        if self._dot is not None:
+            self._dot.widget.bind("<Button-1>", self.toggle)
         self._refresh()
+
+    def set_dot(self, color):
+        "Recolour the header dot (None empties it, keeping its column). No-op"
+        " without one."
+        if self._dot is not None:
+            self._dot.set_color(color)
+
+    def set_dot_slot(self, on):
+        "Show or give back the whole dot column — the switch behind a 'show the"
+        " badges' preference. No-op without one."
+        if self._dot is None:
+            return
+        if on:
+            self._dot.widget.pack(side="left", padx=(0, s(6)),
+                                  before=self._dot_before)
+        else:
+            self._dot.widget.pack_forget()
 
     def toggle(self, _e=None):
         "Flip open/closed (the header click) and report it to ``on_toggle``."

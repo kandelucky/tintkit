@@ -66,7 +66,7 @@ Read any token anywhere with `theme["accent"]`, `theme["panel"]`,
 |---|---|
 | `tintkit/theme.py` | dark/light schemes, accent + danger/warn derivation, repaint observer |
 | `tintkit/icons.py` | the Lucide icon loader (recoloured per theme) |
-| `tintkit/primitives.py` | `rounded_rect`, the `CanvasControl` base, themed `Surface` / `Label` |
+| `tintkit/primitives.py` | `rounded_rect`, the `CanvasControl` base, themed `Surface` / `Label` / `Dot` |
 | `tintkit/controls.py` | Button, Slider, Toggle, Radio, Checkbox, SegmentedTabs, Dropdown, Badge, Tag, ProgressBar, Tooltip, TextField |
 | `tintkit/containers.py` | Card, dialog, callout, section header, drag sashes, scrollbar |
 | `tintkit/composites.py` | toolbar, tool rail, folder nav + tree, selection views, settings window |

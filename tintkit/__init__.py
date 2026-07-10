@@ -25,7 +25,7 @@ from .icons import set_icon_dir
 from .scaling import s, set_scale
 from .theme import (Theme, mix, lighten, darken, on_color,
                     SCHEMES, DEFAULT_ACCENT)
-from .primitives import (CanvasControl, Surface, Label, IconLabel,
+from .primitives import (CanvasControl, Dot, Surface, Label, IconLabel,
                          rounded_rect, put_icon, font, measure, FONT_FAMILY,
                          resolve_font)
 from .controls import (Button, IconButton, Slider, TitledSlider, Toggle, Radio,
@@ -42,7 +42,7 @@ __all__ = [
     "Theme", "mix", "lighten", "darken", "on_color", "SCHEMES",
     "DEFAULT_ACCENT", "icons", "set_icon_dir", "setup_dpi",
     "enable_dpi_awareness", "s", "set_scale",
-    "CanvasControl", "Surface", "Label", "IconLabel",
+    "CanvasControl", "Dot", "Surface", "Label", "IconLabel",
     "rounded_rect", "put_icon", "font", "measure", "FONT_FAMILY", "resolve_font",
     "Button", "IconButton", "Slider", "TitledSlider", "Toggle", "Radio",
     "RadioGroup",

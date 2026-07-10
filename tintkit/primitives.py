@@ -21,6 +21,8 @@ import tkinter as tk
 import tkinter.font as tkfont
 
 from . import icons
+from .scaling import s
+from .theme import darken, lighten
 
 # UI font. Segoe UI is Windows-only, so we pick a native face per OS and, at
 # ``setup_dpi`` time, verify it is actually installed — falling back to Tk's own
@@ -309,6 +311,69 @@ class Label(_Themed):
     def _restyle(self):
         try:
             self.widget.configure(fg=self.theme[self._fg], bg=self.theme[self._bg])
+        except tk.TclError:
+            pass
+
+
+class Dot(_Themed):
+    """A small filled circle for grading the thing beside it — cost, risk, state.
+
+    The colour is a fixed hex, not a theme token: a grade means the same in dark
+    and light mode. Only the background follows the theme, and it has to, since
+    the circle is anti-aliased by pre-blending it over that background (a plain
+    ``create_oval`` this small reads as a lumpy square).
+
+    A hairline rim seats the circle on its background rather than outlining it.
+    By default the rim is the fill's OWN colour pushed toward the background's
+    side — a darker shade of it on a dark background, a lighter one on a light
+    background. So the edge always reads (a flat white cannot be lightened, a
+    grade's own shade always can) and it never announces itself the way a black
+    or white ring would. Pass a hex to fix the rim, or ``None`` to drop it.
+
+        Dot(strip, theme, "#C0574E", bg="bar").pack(side="left")
+    """
+
+    PX = 5           # diameter, logical px
+    RIM_MIX = 0.45   # how far the rim is pushed from the fill, 0..1
+
+    def __init__(self, parent, theme, color, bg="panel", px=None,
+                 outline="auto"):
+        self._color, self._bg = color, bg
+        self._outline = outline
+        self._px = s(px or self.PX)
+        box = self._px + 2               # aa_oval pads by 1 all round
+        self._bind_theme(theme, tk.Canvas(parent, width=box, height=box,
+                                          highlightthickness=0, bd=0))
+
+    def _rim(self, bg):
+        "The rim colour for the current fill over the resolved background `bg`."
+        if self._outline != "auto":
+            return self._outline
+        r, g, b = _hex_rgb(bg)
+        luma = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+        push = darken if luma < 0.5 else lighten
+        return push(self._color, self.RIM_MIX)
+
+    def set_color(self, color):
+        "Recolour the dot; None leaves an empty (background-coloured) box."
+        self._color = color
+        self._restyle()
+
+    def set_bg(self, bg):
+        "Re-blend over a different background token — call this when the dot sits"
+        " on a row that lights up on hover, or the circle keeps its old fringe."
+        self._bg = bg
+        self._restyle()
+
+    def _restyle(self):
+        try:
+            bg = self.theme[self._bg]
+            self.widget.delete("all")
+            self.widget.configure(bg=bg)
+            if self._color:
+                aa_oval(self.widget, 1, 1, 1 + self._px, 1 + self._px,
+                        fill=self._color, outline=self._rim(bg),
+                        width=max(1, s(1)), behind=bg)
         except tk.TclError:
             pass
 

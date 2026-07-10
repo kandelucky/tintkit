@@ -19,8 +19,8 @@ import tkinter as tk
 from . import icons
 from .scaling import s
 from .theme import mix, on_color
-from .primitives import (CanvasControl, rounded_rect, aa_oval, aa_round_rect,
-                         put_icon, font, measure)
+from .primitives import (CanvasControl, Dot, rounded_rect, aa_oval,
+                         aa_round_rect, put_icon, font, measure)
 
 
 # ----------------------------------------------------------------------------
@@ -665,12 +665,22 @@ class TitledSlider:
     ``value_fmt(value, neutral) -> str`` overrides the readout (default: the
     signed delta from neutral, matching :class:`Slider`). ``.set()`` / ``.get()``
     mirror the plain slider; ``on_reset`` fires when the reset icon is clicked —
-    the host updates the model, then usually calls ``.set()`` to refresh."""
+    the host updates the model, then usually calls ``.set()`` to refresh.
+
+    ``dot`` paints a small status dot at the strip's left edge, ahead of the
+    label — a fixed hex, like ``chip``, for grading the slider itself (cost,
+    risk, strength). ``dot_tip`` is its hover text. ``dot_slot`` keeps the dot's
+    column even when there is no colour: pass it on EVERY slider of a stack, so
+    the graded and the ungraded rows share one label margin and one dot column.
+    ``set_dot_slot(False)`` gives the column back."""
+
+    DOT_PX = 5        # dot diameter, logical px (scaled by s())
 
     def __init__(self, parent, theme, label, value=132, lo=0, hi=200,
                  neutral=100, command=None, bg="bg", on_press=None,
                  on_release=None, on_reset=None, reset_tip="Reset",
-                 value_fmt=None, chip=None, compact=False):
+                 value_fmt=None, chip=None, compact=False, dot=None,
+                 dot_tip="", dot_slot=False):
         self.theme = theme
         self._bg = bg
         self.neutral = neutral
@@ -686,8 +696,20 @@ class TitledSlider:
         self.frame = tk.Frame(parent, bg=theme[bg])
         strip = tk.Frame(self.frame, bg=theme[bg])
         strip.pack(fill="x")
-        # Optional colour swatch (e.g. a colour-mixer band) at the strip's left.
-        # A fixed hex, not a theme token, so the restyle pass leaves it alone.
+        # Status dot, at the strip's left edge — the slider's own grade. It leads
+        # the row rather than trailing the label so that on a stack of sliders
+        # every badge lands in one column instead of chasing each label's width.
+        # An ungraded row still holds the column (a blank canvas), or its label
+        # would sit 10px left of its neighbours'.
+        self._dot = None
+        if dot or dot_slot:
+            self._dot = Dot(strip, theme, dot, bg=bg, px=self.DOT_PX)
+            self._dot.pack(side="left", padx=(0, s(5)))
+            if dot_tip:
+                HoverTip(self._dot.widget, theme, dot_tip)
+        # Optional colour swatch (e.g. a colour-mixer band), just before the
+        # label. A fixed hex, not a theme token, so the restyle pass leaves it
+        # alone.
         if chip:
             sw = tk.Frame(strip, bg=chip, width=s(10), height=s(10))
             sw.pack(side="left", padx=(0, s(6)))
@@ -696,6 +718,9 @@ class TitledSlider:
         self._title = tk.Label(strip, text=label, bg=theme[bg], fg=theme["fg"],
                                font=font(fs))
         self._title.pack(side="left")
+        # What a re-shown dot has to sit in front of, so it stays the leftmost
+        # thing in the strip whatever `set_dot` does later.
+        self._dot_before = getattr(self, "_chip", self._title)
         # Reset icon lives in the strip (not beside the track), so the track
         # gets the full width. Packed before the value so it stays rightmost.
         if on_reset is not None:
@@ -742,6 +767,24 @@ class TitledSlider:
         "The bare track's canvas — attach a HoverTip / extra binding here."
         return self._slider.canvas
 
+    def set_dot(self, color):
+        "Recolour the status dot (None empties it, keeping its column). No-op if"
+        " built without one."
+        if self._dot is not None:
+            self._dot.set_color(color)
+
+    def set_dot_slot(self, on):
+        "Show or give back the whole dot column — the switch behind a 'show the"
+        " badges' preference. Off leaves the label flush left, as if the slider"
+        " had never asked for a dot. No-op if built without one."
+        if self._dot is None:
+            return
+        if on:
+            self._dot.widget.pack(side="left", padx=(0, s(5)),
+                                  before=self._dot_before)
+        else:
+            self._dot.widget.pack_forget()
+
     # -- theme -------------------------------------------------------------
     def _restyle(self):
         try:
@@ -753,7 +796,7 @@ class TitledSlider:
             self._title.configure(bg=bg, fg=t["fg"])
             self._value.configure(bg=bg, fg=t["fg_dim"])
         except tk.TclError:
-            pass
+            pass                  # the Dot restyles itself — it owns its theme sub
 
     def _destroyed(self, e):
         if e.widget is self.frame:
