@@ -15,7 +15,7 @@ from .primitives import Surface, Label, IconLabel, rounded_rect, put_icon, font
 from . import icons
 from .controls import (IconButton, Toggle, Dropdown, SegmentedTabs, Slider,
                        Button, Badge)
-from .containers import Card, SectionHeader, themed_scrollbar
+from .containers import Card, SectionHeader, callout, themed_scrollbar
 
 
 # ----------------------------------------------------------------------------
@@ -733,8 +733,23 @@ class SettingsWindow:
         right.widget.pack(side="right", padx=(s(16), 0))
         return right.widget
 
-    def note(self, text):
-        "A small dim explanatory line under a block."
+    def note(self, text, kind=None, title=None):
+        """A small dim explanatory line under a block.
+
+        Pass ``kind`` (``"info"`` / ``"tip"`` / ``"warn"``) to raise the line
+        into a full :func:`callout` instead — a coloured edge, an icon and a
+        title. Use it for the few notes that warn or advise; a plain note is
+        right for the rest, and a page where everything shouts says nothing.
+        """
+        if kind:
+            # The callout must read as raised off the pane, so it cannot share
+            # the pane's own token: a "panel" pane lifts, a darker one takes
+            # "panel" as its fill.
+            fill = "lift" if self._pane_bg == "panel" else "panel"
+            c = callout(self.body.widget, self.theme, kind, text, title=title,
+                        bg=fill, outer=self._pane_bg, wraplength=400)
+            c.pack(fill="x", pady=(s(10), 0))
+            return c
         return Label(self.body.widget, self.theme, text, fg="fg_dim",
                      bg=self._pane_bg, size=8, anchor="w", justify="left",
                      wraplength=s(440)).pack(fill="x", pady=(s(10), 0))

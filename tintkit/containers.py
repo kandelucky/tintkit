@@ -226,15 +226,68 @@ class SectionHeader(CanvasControl):
 
 
 # ----------------------------------------------------------------------------
-# Hero line — the accent-bar dialog heading
+# Hero line — the accent-bar heading, for dialogs and tool panels
 # ----------------------------------------------------------------------------
-def hero_line(parent, theme, title, bg="panel"):
-    row = Surface(parent, theme, bg=bg)
-    Surface(row.widget, theme, bg="accent", width=s(3)).pack(side="left",
-                                                             fill="y")
-    Label(row.widget, theme, "  " + title, fg="fg", bg=bg, size=14,
-          bold=True).pack(side="left")
-    return row
+class HeroLine:
+    """A heading: a 3px accent bar, an optional accent icon, then the title.
+
+    The bar carries the accent so the title itself stays plain ``fg`` — a filled
+    heading would spend the accent on a word that never changes, and leave the
+    section's own controls with nothing to stand out against.
+
+        HeroLine(panel, theme, "Actions", icon="circle-play", bg="bar").pack(
+            fill="x")
+
+    ``set_title`` / ``set_icon`` retitle a heading in place, so a panel that
+    swaps its content between tools keeps one heading widget rather than
+    rebuilding it. ``size`` and ``pad`` size the strip: a dialog wants the roomy
+    default, a tool panel usually a smaller title and its own padding.
+    """
+
+    def __init__(self, parent, theme, title, icon=None, bg="panel", size=14,
+                 icon_px=16, pad=(0, 0)):
+        self.theme = theme
+        self._bg = bg
+        self.row = Surface(parent, theme, bg=bg)
+        Surface(self.row.widget, theme, bg="accent", width=s(3)).pack(
+            side="left", fill="y")
+        body = Surface(self.row.widget, theme, bg=bg)
+        body.widget.pack(side="left", fill="x", expand=True, padx=(s(pad[0]), 0),
+                         pady=s(pad[1]))
+        self._icon = None
+        if icon:
+            self._icon = IconLabel(body.widget, theme, icon, icon_px,
+                                   fg="accent", bg=bg)
+            self._icon.widget.pack(side="left", padx=(s(10), 0))
+        self._label = Label(body.widget, theme, title, fg="fg", bg=bg,
+                            size=size, bold=True)
+        self._label.widget.pack(side="left", padx=(s(6) if icon else s(10), 0))
+
+    def set_title(self, title):
+        self._label.widget.configure(text=title)
+
+    def set_icon(self, name):
+        "Swap the icon. Only works on a hero built WITH one (no column to fill)."
+        if self._icon is not None:
+            self._icon.set_icon(name)
+
+    def pack(self, **k):
+        self.row.pack(**k)
+        return self
+
+    def grid(self, **k):
+        self.row.grid(**k)
+        return self
+
+    def place(self, **k):
+        self.row.place(**k)
+        return self
+
+
+def hero_line(parent, theme, title, icon=None, bg="panel", size=14,
+              icon_px=16, pad=(0, 0)):
+    "Functional shortcut: build a :class:`HeroLine`. Pack it yourself."
+    return HeroLine(parent, theme, title, icon, bg, size, icon_px, pad)
 
 
 # ----------------------------------------------------------------------------
@@ -247,21 +300,29 @@ _CALLOUTS = {
 }
 
 
-def callout(parent, theme, kind, text, title=None):
+def callout(parent, theme, kind, text, title=None, bg="panel", outer="bg",
+            wraplength=260):
+    """A note / tip / warning: a coloured edge, an icon, a title, a body line.
+
+    ``bg`` is the card's own fill; ``outer`` is the surface it sits on. Pass the
+    host's token when the callout lands on something other than the page — the
+    rounded corners paint ``outer``, so a wrong token shows as a light notch.
+    """
     edge, icon, deflabel, lcol = _CALLOUTS[kind]
     title = title or deflabel
-    card = Card(parent, theme, pad=10, bg="panel")
+    card = Card(parent, theme, pad=10, bg=bg, outer=outer)
     Surface(card.body, theme, bg=edge, width=s(3)).pack(side="left", fill="y")
-    pad = Surface(card.body, theme, bg="panel")
+    pad = Surface(card.body, theme, bg=bg)
     pad.widget.pack(side="left", fill="both", expand=True, padx=s(10), pady=s(2))
-    head = Surface(pad.widget, theme, bg="panel")
+    head = Surface(pad.widget, theme, bg=bg)
     head.widget.pack(fill="x", anchor="w")
-    IconLabel(head.widget, theme, icon, 15, fg=edge, bg="panel").pack(
+    IconLabel(head.widget, theme, icon, 15, fg=edge, bg=bg).pack(
         side="left", padx=(0, s(7)))
-    Label(head.widget, theme, title, fg=lcol, bg="panel", size=9,
+    Label(head.widget, theme, title, fg=lcol, bg=bg, size=9,
           bold=True).pack(side="left")
-    Label(pad.widget, theme, text, fg="fg_dim", bg="panel", size=9,
-          justify="left", wraplength=s(260)).pack(anchor="w", pady=(s(3), 0))
+    Label(pad.widget, theme, text, fg="fg_dim", bg=bg, size=9,
+          justify="left", wraplength=s(wraplength)).pack(anchor="w",
+                                                         pady=(s(3), 0))
     return card
 
 
