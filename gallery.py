@@ -18,13 +18,14 @@ import tkinter.ttk as ttk
 
 from tintkit import (
     Theme, setup_dpi, icons, mix, s,
-    Surface, Label, font,
-    Button, IconButton, Slider, Toggle, RadioGroup, Checkbox, SegmentedTabs,
-    Badge, Tag, ProgressBar, Tooltip, TextField, Dropdown, MultiDropdown,
-    Card, SectionHeader, hero_line, callout, dialog, v_sash, h_sash,
+    Surface, Label, IconLabel, Dot, font,
+    Button, IconButton, Slider, TitledSlider, Toggle, RadioGroup, Checkbox,
+    SegmentedTabs, Badge, Tag, ProgressBar, Tooltip, HoverTip, TextField,
+    TextArea, Dropdown, MultiDropdown,
+    Card, Foldout, SectionHeader, hero_line, callout, dialog, v_sash, h_sash,
     themed_scrollbar,
-    toolbar, tool_rail, FolderNav, SelectTile, SelectRow,
-    SettingsWindow, CanvasControl, rounded_rect,
+    toolbar, tool_rail, FolderNav, FolderTree, SelectTile, SelectRow,
+    multiselect_list, SettingsWindow, CanvasControl, rounded_rect,
 )
 
 try:
@@ -148,6 +149,7 @@ def build_elements(parent, theme):
         ("Full-width button",
          lambda p: Button(p, theme, "Clear all", role="neutral",
                           icon="rotate-ccw", stretch=True, h=40)),
+        ("Icon buttons", lambda p: _icon_buttons(p, theme)),
         ("Slider", lambda p: Slider(p, theme, "Exposure", value=134)),
         ("Slider with colour",
          lambda p: Slider(p, theme, "Red", value=72, chip="#c98b80")),
@@ -171,7 +173,15 @@ def build_elements(parent, theme):
         ("Tags (status)", lambda p: _tags(p, theme)),
         ("Progress bar", lambda p: ProgressBar(p, theme, 0.62)),
         ("Text field", lambda p: TextField(p, theme, "File name")),
+        ("Text area (multi-line)",
+         lambda p: TextArea(p, theme, "Shot on a grey morning by the lake.\n"
+                            "Lifted the shadows, cooled the highlights.",
+                            height=3)),
         ("Tooltip", lambda p: Tooltip(p, theme, "Hand tool — drag to pan")),
+        ("Hover tip — hover the buttons", lambda p: _hovertips(p, theme)),
+        ("Icon label", lambda p: _icon_labels(p, theme)),
+        ("Status dots — a fixed grade, not a token",
+         lambda p: _dots(p, theme)),
     ]
     for i, (cap, builder) in enumerate(items):
         cell = Surface(g, theme, bg="bg")
@@ -217,6 +227,57 @@ def _checks(p, theme):
     return row
 
 
+def _icon_buttons(p, theme):
+    row = Surface(p, theme, bg="bg")
+    for icon, active in [("undo", False), ("redo", False), ("crop", True),
+                         ("info", False)]:
+        IconButton(row.widget, theme, icon, active=active, bg="bg").pack(
+            side="left", padx=(0, 6))
+    # captioned rail tile — the same control with label=
+    IconButton(row.widget, theme, "droplets", w=46, h=44, label="Colors",
+               bg="bg").pack(side="left", padx=(12, 0))
+    return row
+
+
+def _hovertips(p, theme):
+    row = Surface(p, theme, bg="bg")
+    save = Button(row.widget, theme, "Save", role="primary", icon="save")
+    save.pack(side="left", padx=(0, 8))
+    HoverTip(save.canvas, theme, "Save (Ctrl+S)")
+    note = Button(row.widget, theme, "Export", role="neutral", icon="folder-open")
+    note.pack(side="left")
+    HoverTip(note.canvas, theme, "Writes a copy beside the original; the "
+             "negative is never touched.", wrap=180)
+    return row
+
+
+def _icon_labels(p, theme):
+    row = Surface(p, theme, bg="bg")
+    for name in ("crop", "droplets", "sliders-horizontal", "star", "info"):
+        IconLabel(row.widget, theme, name, 16, fg="fg_dim", bg="bg").pack(
+            side="left", padx=(0, 12))
+    IconLabel(row.widget, theme, "star", 16, fg="accent", bg="bg").pack(
+        side="left")
+    return row
+
+
+# A grade means the same in dark and light, so these are fixed hex, not tokens.
+GRADES = [("#5f9e6a", "Cheap — recomputed instantly"),
+          ("#c9a24a", "Moderate — taxes later edits"),
+          ("#c0574e", "Costly — forces a full re-render")]
+
+
+def _dots(p, theme):
+    row = Surface(p, theme, bg="bg")
+    for color, tip in GRADES:
+        d = Dot(row.widget, theme, color, bg="bg")
+        d.pack(side="left", padx=(0, 6))
+        HoverTip(d.widget, theme, tip, wrap=160)
+        Label(row.widget, theme, tip.split(" — ")[0], fg="fg_dim", bg="bg",
+              size=9).pack(side="left", padx=(0, 16))
+    return row
+
+
 def _badges(p, theme):
     row = Surface(p, theme, bg="bg")
     Badge(row.widget, theme, "12 / 248").pack(side="left", padx=(0, 8))
@@ -231,6 +292,155 @@ def _tags(p, theme):
     Tag(row.widget, theme, "Maybe", "warn").pack(side="left", padx=(0, 6))
     Tag(row.widget, theme, "RAW", "neutral").pack(side="left")
     return row
+
+
+def build_titled_sliders(parent, theme):
+    box = Surface(parent, theme, bg="bg")
+    caption(box.widget, theme, "The title sits on its own strip, so a dense "
+            "stack never overlaps its tracks. Drag one — the value tracks it; "
+            "the reset icon appears once it leaves neutral.").pack(
+                anchor="w", pady=(0, 12))
+    grid = Surface(box.widget, theme, bg="bg")
+    grid.widget.pack(fill="x")
+    for i in (0, 1):
+        grid.widget.grid_columnconfigure(i, weight=1, uniform="ts")
+
+    # left: the roomy default, graded with a dot column
+    left = Surface(grid.widget, theme, bg="bg")
+    left.widget.grid(row=0, column=0, sticky="new", padx=(0, s(26)))
+    caption(left.widget, theme, "Default — dot column shared by every row").pack(
+        anchor="w", pady=(0, s(6)))
+    rows = [("Exposure", 132, None, GRADES[0][0]),
+            ("Contrast", 100, None, None),
+            ("Clarity", 118, None, GRADES[1][0]),
+            ("Dehaze", 100, None, GRADES[2][0])]
+    for label, val, chip, dot in rows:
+        ts = TitledSlider(left.widget, theme, label, value=val, chip=chip,
+                          dot=dot, dot_slot=True,
+                          dot_tip=next((t for c, t in GRADES if c == dot), ""),
+                          on_reset=lambda: None)
+        ts.pack(fill="x", pady=(0, s(8)))
+        _REFS.append(ts)
+
+    # right: compact rows + a colour chip
+    right = Surface(grid.widget, theme, bg="bg")
+    right.widget.grid(row=0, column=1, sticky="new")
+    caption(right.widget, theme, "compact=True — a denser strip for long "
+            "stacks of minor sliders").pack(anchor="w", pady=(0, s(6)))
+    for label, chip in [("Red", "#c98b80"), ("Green", "#8fae9b"),
+                        ("Blue", "#7f9dc0"), ("Gold", "#c9a24a")]:
+        ts = TitledSlider(right.widget, theme, label, value=100, chip=chip,
+                          compact=True, on_reset=lambda: None)
+        ts.pack(fill="x", pady=(0, s(4)))
+        _REFS.append(ts)
+    return box
+
+
+def build_foldouts(parent, theme):
+    box = Surface(parent, theme, bg="bg")
+    caption(box.widget, theme, "A bordered group that folds — the chevron and "
+            "caption live inside the border, and the box grows around whatever "
+            "you stack in .body. Click a header.").pack(anchor="w",
+                                                        pady=(0, 12))
+    grid = Surface(box.widget, theme, bg="bg")
+    grid.widget.pack(fill="x")
+    for i in (0, 1, 2):
+        grid.widget.grid_columnconfigure(i, weight=1, uniform="fo")
+
+    # open, holding real controls
+    fo = Foldout(grid.widget, theme, "LIGHT", open=True, bg="bg")
+    fo.box.grid(row=0, column=0, sticky="new", padx=(0, s(14)))
+    for label in ("Exposure", "Contrast", "Shadows"):
+        TitledSlider(fo.body, theme, label, value=100, bg="bg", compact=True,
+                     on_reset=lambda: None).pack(fill="x", pady=(0, s(4)))
+
+    # graded, closed
+    fo2 = Foldout(grid.widget, theme, "DETAIL", open=False, bg="bg",
+                  dot=GRADES[2][0], dot_tip=GRADES[2][1])
+    fo2.box.grid(row=0, column=1, sticky="new", padx=(0, s(14)))
+    for label in ("Sharpen", "Noise"):
+        TitledSlider(fo2.body, theme, label, value=100, bg="bg", compact=True,
+                     on_reset=lambda: None).pack(fill="x", pady=(0, s(4)))
+
+    # ungraded but holding the dot column, so the captions line up with fo2
+    fo3 = Foldout(grid.widget, theme, "EFFECTS", open=False, bg="bg",
+                  dot_slot=True)
+    fo3.box.grid(row=0, column=2, sticky="new")
+    Checkbox(fo3.body, theme, "Film grain", "on").pack(anchor="w", pady=s(3))
+    Checkbox(fo3.body, theme, "Vignette", "off").pack(anchor="w", pady=s(3))
+    _REFS.extend([fo, fo2, fo3])
+    return box
+
+
+def build_folder_tree(parent, theme):
+    box = Surface(parent, theme, bg="bg")
+    caption(box.widget, theme, "The tree body on its own — no crumbs, no count. "
+            "The filter box is persistent: typing rebuilds only the rows, so it "
+            "never loses focus.").pack(anchor="w", pady=(0, 12))
+    grid = Surface(box.widget, theme, bg="bg")
+    grid.widget.pack(fill="x")
+    grid.widget.grid_columnconfigure(0, weight=1, uniform="ft")
+    grid.widget.grid_columnconfigure(1, weight=1, uniform="ft")
+
+    KIDS = {"Pictures": ["2024", "2025", "Scans"], "2024": ["Wedding", "Trip"],
+            "2025": ["Studio"]}
+    PARENT = {c: p for p, cs in KIDS.items() for c in cs}
+    state = {"expanded": {"Pictures", "2024"}, "current": "Wedding",
+             "filter": ""}
+
+    def rows():
+        out = []
+
+        def walk(name, depth):
+            kids = KIDS.get(name, [])
+            kind = ("open" if name in state["expanded"] else "closed") if kids \
+                else "leaf"
+            flt = state["filter"]
+            if not flt or flt in name.lower():
+                out.append((depth, name, kind, name == state["current"], name))
+            if kids and (name in state["expanded"] or flt):
+                for k in kids:
+                    walk(k, depth + 1)
+
+        walk("Pictures", 0)
+        return out
+
+    def on_row(name):
+        state["current"] = name
+        state["expanded"].add(name)
+        tree.set_rows(rows())
+
+    def on_toggle(name):
+        state["expanded"].symmetric_difference_update({name})
+        tree.set_rows(rows())
+
+    def on_filter(text):
+        state["filter"] = text.lower().strip()
+        tree.set_rows(rows())
+
+    # with a live filter box
+    left = Surface(grid.widget, theme, bg="bg")
+    left.widget.grid(row=0, column=0, sticky="new", padx=(0, s(26)))
+    caption(left.widget, theme, "filter_text= — a live search row").pack(
+        anchor="w", pady=(0, s(6)))
+    tree = FolderTree(left.widget, theme, filter_text="Filter folders",
+                      on_row=on_row, on_toggle=on_toggle, on_filter=on_filter)
+    tree.set_rows(rows())
+    tree.pack(fill="x")
+
+    # without one — a plain 'Folders' caption instead
+    right = Surface(grid.widget, theme, bg="bg")
+    right.widget.grid(row=0, column=1, sticky="new")
+    caption(right.widget, theme, "filter_text=None — a plain caption").pack(
+        anchor="w", pady=(0, s(6)))
+    plain = FolderTree(right.widget, theme)
+    plain.set_rows([(0, "Pictures", "open", False, "Pictures"),
+                    (1, "2024", "closed", False, "2024"),
+                    (1, "2025", "closed", True, "2025"),
+                    (1, "Scans", "leaf", False, "Scans")])
+    plain.pack(fill="x")
+    _REFS.extend([tree, plain])
+    return box
 
 
 def build_nav(parent, theme):
@@ -351,10 +561,26 @@ def build_multiselect(parent, theme):
     caption(box.widget, theme, "A multi-select dropdown — click to open, then "
             "tick several rows; the closed chip summarises the choice.").pack(
                 anchor="w", pady=(0, 10))
-    MultiDropdown(box.widget, theme,
+    row = Surface(box.widget, theme, bg="bg")
+    row.widget.pack(fill="x")
+
+    left = Surface(row.widget, theme, bg="bg")
+    left.widget.pack(side="left", anchor="n", padx=(0, s(40)))
+    caption(left.widget, theme, "MultiDropdown — collapses to a chip").pack(
+        anchor="w", pady=(0, s(6)))
+    MultiDropdown(left.widget, theme,
                   ["Sky.jpg", "Ridge.jpg", "Valley.jpg", "Dawn.jpg",
                    "Harbor.jpg", "Forest.jpg", "Dunes.jpg", "Cliff.jpg"],
                   selected=(2, 4)).pack(anchor="w")
+
+    right = Surface(row.widget, theme, bg="bg")
+    right.widget.pack(side="left", anchor="n")
+    caption(right.widget, theme, "multiselect_list — always open, ticks in "
+            "place").pack(anchor="w", pady=(0, s(6)))
+    multiselect_list(right.widget, theme,
+                     [("Keep EXIF", True), ("Keep ICC profile", True),
+                      ("Strip GPS", False), ("Embed thumbnail", False)],
+                     width=220).pack(anchor="w")
     return box
 
 
@@ -379,7 +605,7 @@ def build_dropdowns(parent, theme):
 
 def build_heroes(parent, theme):
     box = Surface(parent, theme, bg="bg")
-    caption(box.widget, theme, "Standard — accent bar + title").pack(
+    caption(box.widget, theme, "Standard — accent bar + title. A dialog heading.").pack(
         anchor="w", pady=(0, 8))
     grid = Surface(box.widget, theme, bg="bg")
     grid.widget.pack(fill="x")
@@ -388,6 +614,30 @@ def build_heroes(parent, theme):
         card = Card(grid.widget, theme, pad=14)
         card.canvas.grid(row=0, column=i, sticky="nsew", padx=(0, 10))
         hero_line(card.body, theme, title).pack(anchor="w", fill="x")
+
+    caption(box.widget, theme, "icon= — a tool panel's section heading. "
+            "set_title / set_icon retitle it in place as the panel swaps "
+            "tools.").pack(anchor="w", pady=(s(18), 8))
+    strip = Surface(box.widget, theme, bg="bar")
+    strip.widget.pack(fill="x")
+    hero = hero_line(strip.widget, theme, "Basic Edits",
+                     icon="sliders-horizontal", bg="bar", size=11,
+                     pad=(0, 9)).pack(fill="x")
+
+    # a live retitle, exactly as Manoni's rail drives its panel heading
+    TOOLS = [("Basic Edits", "sliders-horizontal"), ("Colors", "palette"),
+             ("Crop", "crop"), ("Actions", "circle-play")]
+    picker = Surface(box.widget, theme, bg="bg")
+    picker.widget.pack(anchor="w", pady=(s(10), 0))
+
+    def retitle(i, _label):
+        title, icon = TOOLS[i]
+        hero.set_title(title)
+        hero.set_icon(icon)
+
+    SegmentedTabs(picker.widget, theme, [t for t, _ in TOOLS], selected=0,
+                  command=retitle, bg="bg").pack(anchor="w")
+    _REFS.append(hero)
     return box
 
 
@@ -552,6 +802,12 @@ def build_settings(parent, theme):
                bg="panel").pack()
         Dropdown(win.row("Reject folder name"), theme,
                  ["Rejected", "Trash", "_cull"], bg="panel").pack()
+        # note() plain, then the same call raised into each callout kind
+        win.note("Culling never moves a file until you press Enter.")
+        win.note("Hold Shift while culling to skip the confirmation.",
+                 kind="tip")
+        win.note("Rejected photos are moved, not copied — the originals leave "
+                 "this folder.", kind="warn")
 
     def about(win):
         win.group("About")
@@ -576,6 +832,9 @@ def build_settings(parent, theme):
 # ----------------------------------------------------------------------------
 SECTIONS = [
     ("Elements", build_elements),
+    ("Titled slider — strip, value, reset, dot column", build_titled_sliders),
+    ("Foldout — collapsible groups", build_foldouts),
+    ("Folder tree — filter box + rows", build_folder_tree),
     ("Navigation — folder header", build_nav),
     ("Photo selection — a frame everywhere", build_selection),
     ("Multi-select dropdown — tick many", build_multiselect),
