@@ -37,6 +37,7 @@ from .containers import (Card, Foldout, SectionHeader, HeroLine, hero_line,
 from .composites import (toolbar, tool_rail, FolderNav, FolderTree, folder_tree,
                          SelectTile, SelectRow, MultiSelectRow,
                          multiselect_list, SettingsWindow)
+from .keyboard import recover_char
 
 __all__ = [
     "Theme", "mix", "lighten", "darken", "on_color", "SCHEMES",
@@ -53,6 +54,7 @@ __all__ = [
     "v_sash", "h_sash", "themed_scrollbar",
     "toolbar", "tool_rail", "FolderNav", "FolderTree", "folder_tree", "SelectTile",
     "SelectRow", "MultiSelectRow", "multiselect_list", "SettingsWindow",
+    "recover_char",
 ]
 
 
@@ -102,3 +104,8 @@ def setup_dpi(root, zoom=1.0):
 
 # Set DPI awareness at import — before any tk.Tk() the caller creates.
 enable_dpi_awareness()
+
+# Wire the non-Latin keyboard fixes into every tk.Entry / tk.Text at import,
+# before the caller builds any widget (Georgian typing + clipboard shortcuts).
+from . import keyboard as _keyboard  # noqa: E402
+_keyboard.install()
