@@ -40,6 +40,7 @@ from tintkit import Theme, setup_dpi, Button, Toggle
 
 root = tk.Tk()
 setup_dpi(root)                       # crisp icons on high-DPI screens
+# importing tintkit also fixes non-Latin keyboard input on Windows (see below)
 theme = Theme(scheme="dark", accent="#8fae9b")
 
 Button(root, theme, "Save", icon="save", command=lambda: print("saved")).pack()
@@ -70,6 +71,7 @@ Read any token anywhere with `theme["accent"]`, `theme["panel"]`,
 | `tintkit/controls.py` | Button, Slider, Toggle, Radio, Checkbox, SegmentedTabs, Dropdown, Badge, Tag, ProgressBar, Tooltip, TextField |
 | `tintkit/containers.py` | Card, dialog, callout, section header, drag sashes, scrollbar |
 | `tintkit/composites.py` | toolbar, tool rail, folder nav + tree, selection views, settings window |
+| `tintkit/keyboard.py` | non-Latin keyboard fix on Windows (Georgian, Greek, Thai, Arabic, …): real typing + Ctrl-C/V/X/A + right-click menu, auto-installed on import |
 | `gallery.py` | the style guide window + live switcher |
 
 **Design rules:** no widget hard-codes a colour (each reads `theme[...]` and
