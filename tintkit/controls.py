@@ -874,17 +874,34 @@ class TextArea:
         self.theme = theme
         self._focused = False
         self.outer = tk.Frame(parent, bg=theme["border"])
-        self.text = tk.Text(self.outer, height=height, relief="flat", wrap="word",
+        self._inner = tk.Frame(self.outer, bg=theme["chip"])
+        self._inner.pack(fill="both", expand=True, padx=s(1), pady=s(1))
+        self.text = tk.Text(self._inner, height=height, relief="flat", wrap="word",
                             font=font(10), padx=s(6), pady=s(4),
                             highlightthickness=0, bd=0)
+        from .containers import themed_scrollbar    # lazy: containers imports us
+        self._sb = themed_scrollbar(self._inner, theme, self.text.yview)
+        self._sb_shown = False
+        self.text.configure(yscrollcommand=self._on_scroll)
         if value:
             self.text.insert("1.0", value)
-        self.text.pack(fill="both", expand=True, padx=s(1), pady=s(1))
+        self.text.pack(side="left", fill="both", expand=True)
         self.text.bind("<FocusIn>", lambda e: self._focus(True), add="+")
         self.text.bind("<FocusOut>", lambda e: self._focus(False), add="+")
         theme.subscribe(self._restyle)
         self.outer.bind("<Destroy>", self._destroyed)
         self._restyle()
+
+    def _on_scroll(self, first, last):
+        """Drive the scrollbar and auto-hide it when everything fits."""
+        self._sb.set(first, last)
+        overflow = float(first) > 0.0 or float(last) < 1.0
+        if overflow and not self._sb_shown:
+            self._sb.pack(side="right", fill="y")
+            self._sb_shown = True
+        elif not overflow and self._sb_shown:
+            self._sb.pack_forget()
+            self._sb_shown = False
 
     def _destroyed(self, e):
         if e.widget is self.outer:
@@ -898,6 +915,7 @@ class TextArea:
         try:
             t = self.theme
             self.outer.configure(bg=t["accent"] if self._focused else t["border"])
+            self._inner.configure(bg=t["chip"])
             self.text.configure(bg=t["chip"], fg=t["fg"], insertbackground=t["fg"])
         except tk.TclError:
             pass

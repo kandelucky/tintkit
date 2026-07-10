@@ -175,7 +175,10 @@ def build_elements(parent, theme):
         ("Text field", lambda p: TextField(p, theme, "File name")),
         ("Text area (multi-line)",
          lambda p: TextArea(p, theme, "Shot on a grey morning by the lake.\n"
-                            "Lifted the shadows, cooled the highlights.",
+                            "Lifted the shadows, cooled the highlights.\n"
+                            "Warmed the midtones a touch, then pulled the\n"
+                            "clarity back so the water stayed soft.\n"
+                            "Grab the handle on the right to scroll.",
                             height=3)),
         ("Tooltip", lambda p: Tooltip(p, theme, "Hand tool — drag to pan")),
         ("Hover tip — hover the buttons", lambda p: _hovertips(p, theme)),
